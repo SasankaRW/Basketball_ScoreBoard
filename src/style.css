@@ -1,0 +1,310 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto:wght@700&display=swap');
+
+:root {
+    /* Define base font size for rem units */
+    font-size: 16px;
+
+    /* Color Palette */
+    --bg-color: #050505;
+    --panel-bg: #111;
+    --border-color: #333;
+    --text-light: #f0f0f0;
+    --text-medium: #aaa;
+    --text-dark: #555;
+    --score-blue: #3498db;
+    --score-blue-bg: #05101a;
+    --stat-yellow: #f1c40f;
+    --stat-yellow-bg: #292203;
+    --clock-red: #e74c3c;
+    --clock-red-bg: #2a0e0a;
+    --clock-white: #ffffff;
+    --clock-white-bg: #222;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-light);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    overflow-x: hidden; /* Prevent horizontal scroll on small screens */
+    padding: 1rem; /* Add padding for small screens */
+    box-sizing: border-box;
+}
+
+.scoreboard {
+    display: flex;
+    justify-content: space-between; /* Distribute space */
+    align-items: stretch; /* Make columns equal height */
+    background-color: var(--panel-bg);
+    border: 3px solid var(--border-color);
+    border-radius: 15px; /* Slightly more rounded */
+    padding: clamp(1rem, 2vw, 2rem); /* Responsive padding */
+    width: 100%;
+    max-width: 1400px; /* Allow it to be wider on large screens */
+    box-shadow: 0 5px 25px rgba(100, 150, 255, 0.1); /* Softer shadow */
+    gap: clamp(1rem, 3vw, 3rem); /* Responsive gap between sections */
+    box-sizing: border-box;
+}
+
+/* --- Team Sections (Home & Away) --- */
+.team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between; /* Distribute vertical space */
+    flex: 1; /* Allow teams to take available space */
+    min-width: 180px; /* Minimum width */
+    padding: 1rem 0.5rem; /* Internal padding */
+    box-sizing: border-box;
+}
+
+.team-name {
+    font-family: 'Orbitron', sans-serif;
+    /* Responsive Font Size with Min/Max */
+    font-size: clamp(1.8rem, 4vw, 3.5rem);
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-light);
+    text-align: center;
+    line-height: 1.2;
+}
+
+.score {
+    font-family: 'Orbitron', monospace;
+    /* BIG Responsive Font Size */
+    font-size: clamp(6rem, 10vw, 10rem);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--score-blue);
+    background-color: var(--score-blue-bg);
+    padding: 0.1em 0.2em; /* Padding relative to font size */
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    min-width: 1.8em; /* Ensure minimum width based on font size */
+    text-align: center;
+    display: inline-block; /* Ensure background fits content */
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.4);
+}
+
+.stats {
+    font-size: 1rem; /* Base size for calculation */
+    width: 100%;
+    text-align: center;
+    margin-top: auto; /* Push stats towards bottom */
+}
+
+.stat-line {
+    margin-bottom: 1.5rem;
+}
+.stat-line:last-child {
+    margin-bottom: 0;
+}
+
+.label {
+    font-size: clamp(0.7rem, 1.5vw, 0.9rem); /* Smaller responsive label */
+    color: var(--text-medium);
+    display: block;
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.value {
+    font-family: 'Orbitron', monospace;
+    /* Responsive Stat Value */
+    font-size: clamp(2rem, 10vw, 3.5rem);
+    font-weight: 700;
+    color: var(--stat-yellow);
+    background-color: var(--stat-yellow-bg);
+    padding: 0.1em 0.3em; /* Relative padding */
+    border-radius: 5px;
+    display: inline-block; /* Fit background */
+    min-width: 1.5em;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+/* --- Center Console --- */
+.center-console {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-basis: 40%; /* Suggest initial width, but allow flex */
+    flex-shrink: 0.5; /* Allow shrinking less than teams */
+    padding: 1rem clamp(0.5rem, 3vw, 2rem); /* Responsive padding */
+    gap: clamp(1rem, 3vh, 2rem); /* Responsive vertical gap */
+    box-sizing: border-box;
+}
+
+.game-clock {
+    font-family: 'Orbitron', monospace;
+    /* LARGE Responsive Game Clock */
+    font-size: clamp(5rem, 12vw, 11rem);
+    font-weight: 700;
+    color: var(--clock-white);
+    background-color: var(--clock-white-bg);
+    padding: 0.1em 0.1em;
+    border-radius: 8px;
+    line-height: 1.1;
+    width: 100%; /* Take full width of center console */
+    text-align: center;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.shot-clock {
+    font-family: 'Orbitron', monospace;
+    /* LARGE Responsive Shot Clock */
+    font-size: clamp(4.5rem, 11vw, 10rem);
+    font-weight: 700;
+    color: var(--clock-red);
+    background-color: var(--clock-red-bg);
+    padding: 0.1em 0.3em;
+    border-radius: 8px;
+    line-height: 1.1;
+    width: 70%; /* Slightly narrower than game clock */
+    max-width: 300px; /* Max width for shot clock */
+    text-align: center;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.controls-info {
+    margin-top: auto; /* Push to bottom */
+    font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+    color: var(--text-dark);
+    padding-bottom: 0.5rem;
+    text-align: center;
+    width: 100%;
+}
+
+/* --- Help Modal --- */
+/* Modal styles remain largely the same, adjust if needed */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000; /* Ensure it's on top */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.7); /* Darker overlay */
+}
+
+.modal-content {
+    background-color: #282828; /* Slightly lighter modal bg */
+    color: var(--text-light);
+    margin: 10% auto;
+    padding: clamp(1.5rem, 5vw, 3rem); /* Responsive padding */
+    border: 1px solid var(--border-color);
+    width: 90%;
+    max-width: 550px; /* Slightly wider max */
+    border-radius: 10px;
+    position: relative;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+}
+/* ... (rest of modal styles: h2, ul, li, hr, strong, close-button) ... */
+.modal-content h2 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: var(--clock-red);
+    font-size: clamp(1.5rem, 4vw, 2rem);
+}
+.modal-content ul { list-style: none; padding: 0; }
+.modal-content li { margin-bottom: 0.8rem; line-height: 1.5; font-size: clamp(0.9rem, 2vw, 1rem); }
+.modal-content hr { border: 0; height: 1px; background-color: #444; margin: 1.5rem 0; }
+.modal-content strong { color: var(--stat-yellow); display: inline-block; min-width: 90px; margin-right: 10px;}
+.close-button { color: var(--text-medium); position: absolute; top: 15px; right: 20px; font-size: 2rem; font-weight: bold; cursor: pointer; line-height: 1;}
+.close-button:hover,
+.close-button:focus { color: var(--text-light); text-decoration: none; }
+
+
+/* --- RESPONSIVENESS --- */
+
+@media (max-width: 900px) {
+    .scoreboard {
+        /* Reduce gap on medium screens */
+        gap: clamp(1rem, 2vw, 2rem);
+    }
+     /* Adjust font sizes slightly if needed */
+    .score { font-size: clamp(5rem, 12vw, 10rem); }
+    .game-clock { font-size: clamp(4rem, 10vw, 8rem); }
+    .shot-clock { font-size: clamp(3.5rem, 9vw, 7rem); }
+}
+
+
+@media (max-width: 768px) {
+    body {
+        padding: 0.5rem; /* Less padding on mobile */
+        align-items: flex-start; /* Align to top on mobile */
+        min-height: unset; /* Allow body height to be content-based */
+    }
+
+    .scoreboard {
+        flex-direction: column; /* Stack elements vertically */
+        align-items: center; /* Center items horizontally */
+        width: 100%;
+        max-width: 500px; /* Max width for stacked layout */
+        margin: 1rem auto; /* Center scoreboard vertically */
+        gap: 2rem; /* Vertical gap */
+        padding: 1rem;
+    }
+
+    .team, .center-console {
+        width: 100%; /* Take full width */
+        flex-basis: auto; /* Reset flex basis */
+        align-self: center;
+        padding: 0.5rem;
+    }
+
+    .center-console {
+       order: -1; /* Move clocks above scores on mobile */
+       padding-bottom: 1rem; /* Add padding below clocks */
+       gap: 1rem; /* Reduce gap in center console */
+    }
+
+    .team {
+        justify-content: center; /* Center content vertically in team section */
+        padding-bottom: 1rem;
+    }
+
+    .score {
+        font-size: clamp(5rem, 18vw, 8rem); /* Can be relatively larger on mobile */
+        margin-bottom: 1.5rem;
+    }
+     .game-clock {
+        font-size: clamp(4rem, 15vw, 7rem);
+        margin-bottom: 0; /* Remove bottom margin if stacked */
+    }
+     .shot-clock {
+        font-size: clamp(3.5rem, 13vw, 6rem);
+        width: 60%; /* Adjust width */
+    }
+    .stats {
+        margin-top: 1rem; /* Add space above stats */
+    }
+     .value {
+        font-size: clamp(1.8rem, 6vw, 3rem);
+    }
+
+    .modal-content {
+         margin: 5% auto; /* Less top margin for modal */
+         width: 95%;
+    }
+}
+
+@media (max-width: 480px) {
+     /* Further adjustments for very small screens if needed */
+    .score { font-size: clamp(4rem, 16vw, 6rem); }
+    .game-clock { font-size: clamp(3rem, 13vw, 5rem); }
+    .shot-clock { font-size: clamp(2.5rem, 11vw, 4.5rem); }
+    .team-name { font-size: clamp(1.5rem, 5vw, 2.5rem); }
+    .value { font-size: clamp(1.5rem, 5vw, 2.5rem); }
+    .label { font-size: clamp(0.6rem, 2vw, 0.8rem); }
+}

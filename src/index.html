@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basketball Scoreboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    
+    <div class="scoreboard">
+        <!-- Home Section -->
+        <div class="team home">
+            <div class="team-name">HOME</div>
+            <div class="score" id="home-score">00</div>
+            <div class="stats">
+                <div class="stat-line">
+                    <span class="label">FOULS</span>
+                    <span class="value" id="home-fouls">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Section -->
+        <div class="center-console">
+            <div class="game-clock" id="game-clock">12:00</div>
+            <div class="shot-clock" id="shot-clock">24</div>
+            <div class="controls-info" id="controls-info">
+                Press 'H' for Help
+            </div>
+        </div>
+
+        <!-- Away Section -->
+        <div class="team away">
+            <div class="team-name">AWAY</div>
+            <div class="score" id="away-score">00</div>
+            <div class="stats">
+                <div class="stat-line">
+                    <span class="label">FOULS</span>
+                    <span class="value" id="away-fouls">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal (Hidden by default) -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">×</span>
+            <h2>Keyboard Controls</h2>
+            <ul>
+                <h2>Clock</h2>
+                <li><strong>T:</strong> Start/Stop Game Clock</li>
+                <li><strong>Spacebar:</strong> Start/Stop Shot Clock</li>
+                <li><strong>R:</strong> Reset Shot Clock (12s)</li>
+                <li><strong>Shift + R:</strong> Reset Shot Clock (14s - O.Rebound)</li>
+                <hr>
+                <h2>Score</h2>
+                <li><strong>Arrow Up:</strong> Home Score +1</li>
+                <li><strong>Arrow Down:</strong> Home Score -1</li>
+                <li><strong>Arrow Right:</strong> Away Score +1</li>
+                <li><strong>Arrow Left:</strong> Away Score -1</li>
+                <hr>
+                <h2>Fouls</h2>
+                <li><strong>F:</strong> Home Fouls +1</li>
+                <li><strong>Shift + F:</strong> Home Fouls -1</li>
+                <li><strong>J:</strong> Away Fouls +1</li>
+                <li><strong>Shift + J:</strong> Away Fouls -1</li>
+                <hr>
+                <h2>Timeouts</h2>
+                <li><strong>T:</strong> Home Timeouts -1</li>
+                <li><strong>Shift + T:</strong> Home Timeouts +1</li>
+                <li><strong>Y:</strong> Away Timeouts -1</li>
+                <li><strong>Shift + Y:</strong> Away Timeouts +1</li>
+                 <hr>
+                <li><strong>Enter:</strong> Set Custom Game Time (prompts)</li>
+                <li><strong>H:</strong> Show/Hide This Help</li>
+            </ul>
+        </div>
+    </div>
+
+
+    <script src="script.js"></script>
+</body>
+</html>
