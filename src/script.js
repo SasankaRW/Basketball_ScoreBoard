@@ -62,16 +62,28 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const tickShotClock = () => {
+        if (shotClockSeconds === 1) {
+            // Play the shot clock sound just before hitting zero
+            const shotClockSound = document.getElementById('shotclock-sound');
+            // Change background color to red
+            shotClockEl.style.backgroundColor = 'red';
+            shotClockEl.style.color= 'black';
+            shotClockSound.play();
+        }
+    
         if (shotClockSeconds > 0) {
             shotClockSeconds--;
         } else {
             stopShotClock();
             console.log("Shot Clock Violation!");
-            // Optionally trigger a buzzer sound here
-            // shotClockEl.style.color = 'orange'; // Example visual cue
+    
+            
         }
+    
         updateDisplay();
     };
+    
+    
 
     const startGameClock = () => {
         if (!isGameClockRunning && (gameMinutes > 0 || gameSeconds > 0)) {
@@ -97,6 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(shotClockTimerInterval);
             shotClockTimerInterval = setInterval(tickShotClock, 1000);
             isShotClockRunning = true;
+            shotClockEl.style.backgroundColor = '';
+            shotClockEl.style.color= ''; // Reset to default
             // shotClockEl.style.color = '#e74c3c'; // Reset color if changed on violation
         }
     };
@@ -107,10 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const resetShotClock = (time = SHOT_CLOCK_FULL) => {
-        stopShotClock(); // Always stop when resetting
+       // Always stop when resetting
         shotClockSeconds = time;
         // shotClockEl.style.color = '#e74c3c'; // Reset color
         updateDisplay();
+        shotClockEl.style.backgroundColor = '';
+        shotClockEl.style.color= ''; 
         // Optional: Decide if reset should *automatically* restart the shot clock.
         // Common behaviour: It *might* restart if the game clock is running.
         // Let's keep that conditional start for convenience after reset.
@@ -118,7 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
            startShotClock();
         }
     };
-
     // --- Control Functions (adjustScore, adjustFouls, adjustTimeouts, setCustomTime) ---
     // These functions remain the same as before...
     const adjustScore = (team, delta) => {
