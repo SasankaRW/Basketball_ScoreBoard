@@ -71,13 +71,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const tickShotClock = () => {
+        // Change color for final 3 seconds
+        if (shotClockSeconds <= 3 && shotClockSeconds >= 0) {
+            shotClockEl.style.backgroundColor = 'red';
+            shotClockEl.style.color = 'black';
+        } else {
+            shotClockEl.style.backgroundColor = '';
+            shotClockEl.style.color = '';
+        }
         if (shotClockSeconds === 1) {
             // Play the shot clock sound just before hitting zero
             const shotClockSound = document.getElementById('shotclock-sound');
             shotClockSound.currentTime = 0; // Reset audio to start
-            // Change background color to red
-            shotClockEl.style.backgroundColor = 'red';
-            shotClockEl.style.color= 'black';
             shotClockSound.play().catch(error => {
                 console.error('Error playing shot clock sound:', error);
             });
