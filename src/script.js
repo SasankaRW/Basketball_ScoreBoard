@@ -285,8 +285,18 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyZ' && e.shiftKey) { adjustTimeouts('home', 1); }
         else if (e.code === 'KeyX' && !e.shiftKey) { adjustTimeouts('away', -1); }
         else if (e.code === 'KeyX' && e.shiftKey) { adjustTimeouts('away', 1); }
-
-        // Other Controls
+        // --- Custom Shot Clock Key ---
+        else if (e.code === 'KeyC' && e.shiftKey) { // 'c' - Set Custom Shot Clock
+            let custom = prompt('Enter custom shot clock (seconds):', shotClockSeconds);
+            if (custom !== null) {
+                let val = parseInt(custom, 10);
+                if (!isNaN(val) && val > 0 && val <= 99) {
+                    resetShotClock(val);
+                } else {
+                    alert('Invalid shot clock value. Enter a number between 1 and 99.');
+                }
+            }
+        }
         else if (e.code === 'Enter') { setCustomTime(); }
         else if (e.code === 'KeyG') { // 'g' - Reset Game Clock
             resetGameClock();
