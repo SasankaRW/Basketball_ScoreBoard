@@ -323,3 +323,17 @@ document.addEventListener('DOMContentLoaded', () => {
     controlsInfoEl.textContent = "Press Space to Start Game Clock"; // Updated initial instruction
 
 });
+
+// Remove editTeamName function and old keydown for 'n'/'N', replace with unified hotkey logic
+const homeTeamNameEl = document.getElementById('home-team-name');
+const awayTeamNameEl = document.getElementById('away-team-name');
+
+// --- Unified Team Name Hotkey ---
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'n' || e.key === 'N') {
+        let homeName = prompt('Enter Home Team Name:', homeTeamNameEl.textContent);
+        let awayName = prompt('Enter Away Team Name:', awayTeamNameEl.textContent);
+        if (homeName && homeName.trim().length > 0) homeTeamNameEl.textContent = homeName.trim();
+        if (awayName && awayName.trim().length > 0) awayTeamNameEl.textContent = awayName.trim();
+    }
+});
