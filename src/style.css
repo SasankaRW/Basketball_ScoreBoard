@@ -83,12 +83,12 @@ body {
 
 .score {
     font-family: 'Orbitron', monospace;
-    font-size: clamp(5rem, 10vw, 13rem);
+    font-size: clamp(5rem, 30vw, 15rem);
     font-weight: 700;
     line-height: 1;
     color: var(--score-blue);
     background-color: var(--score-blue-bg);
-    padding: 0.1em 0.2em;
+  
     border-radius: 8px;
     margin: 0.5rem auto 1.5rem;
     min-width: 1.8em;
@@ -271,7 +271,7 @@ body {
         gap: clamp(1rem, 2vw, 2rem);
     }
      /* Adjust font sizes slightly if needed */
-    .score { font-size: clamp(5rem, 12vw, 10rem); }
+    .score { font-size: clamp(5rem, 30vw, 15rem); }
     .game-clock { font-size: clamp(4rem, 10vw, 8rem); }
     .shot-clock { font-size: clamp(3.5rem, 9vw, 7rem); }
 }
