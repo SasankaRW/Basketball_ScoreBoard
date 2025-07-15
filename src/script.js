@@ -1,3 +1,22 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyB0I8H2bAIFMMB01n-4p-G3ogxbmp3Nii8",
+  authDomain: "basketballscoreboard-65c95.firebaseapp.com",
+  projectId: "basketballscoreboard-65c95",
+  storageBucket: "basketballscoreboard-65c95.firebasestorage.app",
+  messagingSenderId: "31697951521",
+  appId: "1:31697951521:web:074259ad89964d30437c60"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const stateRef = ref(db, 'scoreboardState');
+
+// --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
     // Prevent context menu on right click for the entire document
     document.addEventListener('contextmenu', e => e.preventDefault());
@@ -15,209 +34,172 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModalBtn = document.querySelector('.close-button');
     const controlsInfoEl = document.getElementById('controls-info');
 
-    // --- State Variables ---
-    let homeScore = 0;
-    let awayScore = 0;
-    let homeFouls = 0;
-    let awayFouls = 0;
-    let homeTimeouts = 2;
-    let awayTimeouts = 2;
-
-    let gameMinutes = 10;
-    let gameSeconds = 0;
-    let shotClockSeconds = 12;
-
-    let gameTimerInterval = null;
-    let shotClockTimerInterval = null;
-    let isGameClockRunning = false;
-    let isShotClockRunning = false;
-
-    const SHOT_CLOCK_FULL = 12;
-    const SHOT_CLOCK_OREB = 12;
-    const MAX_FOULS = 99;
-    const MAX_TIMEOUTS = 9;
-    const MAX_SCORE = 999;
-    const GAME_CLOCK_FULL = 10;
+    // --- State Object ---
+    let scoreboardState = {
+        homeScore: 0,
+        awayScore: 0,
+        homeFouls: 0,
+        awayFouls: 0,
+        homeTimeouts: 2,
+        awayTimeouts: 2,
+        gameMinutes: 10,
+        gameSeconds: 0,
+        shotClockSeconds: 12,
+        isGameClockRunning: false,
+        isShotClockRunning: false
+    };
 
     // --- Update Functions ---
     const updateDisplay = () => {
-        homeScoreEl.textContent = String(homeScore).padStart(2, '0');
-        awayScoreEl.textContent = String(awayScore).padStart(2, '0');
-        gameClockEl.textContent = `${String(gameMinutes).padStart(2, '0')}:${String(gameSeconds).padStart(2, '0')}`;
-        shotClockEl.textContent = String(shotClockSeconds).padStart(2, '0');
-        homeFoulsEl.textContent = homeFouls;
-        awayFoulsEl.textContent = awayFouls;
-        homeTimeoutsEl.textContent = homeTimeouts;
-        awayTimeoutsEl.textContent = awayTimeouts;
+        homeScoreEl.textContent = String(scoreboardState.homeScore).padStart(2, '0');
+        awayScoreEl.textContent = String(scoreboardState.awayScore).padStart(2, '0');
+        gameClockEl.textContent = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
+        shotClockEl.textContent = String(scoreboardState.shotClockSeconds).padStart(2, '0');
+        homeFoulsEl.textContent = scoreboardState.homeFouls;
+        awayFoulsEl.textContent = scoreboardState.awayFouls;
+        homeTimeoutsEl.textContent = scoreboardState.homeTimeouts;
+        awayTimeoutsEl.textContent = scoreboardState.awayTimeouts;
     };
 
-    // --- Timer Functions ---
-    const tickGameClock = () => {
-        if (gameSeconds > 0) {
-            gameSeconds--;
-        } else if (gameMinutes > 0) {
-            gameMinutes--;
-            gameSeconds = 59;
+    // --- Firebase Sync ---
+    function pushStateToFirebase() {
+        set(stateRef, scoreboardState);
+    }
+
+    // --- Listen for Firebase changes ---
+    onValue(stateRef, (snapshot) => {
+        const newState = snapshot.val();
+        if (newState) {
+            scoreboardState = { ...scoreboardState, ...newState };
+            updateDisplay();
+        }
+    });
+
+    // --- Timer Functions (refactored) ---
+    function tickGameClock() {
+        if (scoreboardState.gameSeconds > 0) {
+            scoreboardState.gameSeconds--;
+        } else if (scoreboardState.gameMinutes > 0) {
+            scoreboardState.gameMinutes--;
+            scoreboardState.gameSeconds = 59;
         } else {
-            stopGameClock(); // Stop at 00:00
+            stopGameClock();
             const gameOverSound = document.getElementById('game-over-sound');
-            gameOverSound.currentTime = 0; 
-            gameOverSound.play().catch(error => {
-                console.error('Error playing game over sound:', error);
-            });
+            gameOverSound.currentTime = 0;
+            gameOverSound.play().catch(() => {});
             alert("Game Over!");
         }
-        updateDisplay();
-    };
-
-    const tickShotClock = () => {
-        // Change color for final 3 seconds
-        if (shotClockSeconds <= 3 && shotClockSeconds >= 0) {
-            shotClockEl.style.backgroundColor = 'red';
-            shotClockEl.style.color = 'black';
-        } else {
-            shotClockEl.style.backgroundColor = '';
-            shotClockEl.style.color = '';
-        }
-        if (shotClockSeconds === 1) {
-            // Play the shot clock sound just before hitting zero
-            const shotClockSound = document.getElementById('shotclock-sound');
-            shotClockSound.currentTime = 0; // Reset audio to start
-            shotClockSound.play().catch(error => {
-                console.error('Error playing shot clock sound:', error);
-            });
-        }
-
-        if (shotClockSeconds > 0) {
-            shotClockSeconds--;
+        pushStateToFirebase();
+    }
+    function tickShotClock() {
+        if (scoreboardState.shotClockSeconds > 0) {
+            scoreboardState.shotClockSeconds--;
         } else {
             stopShotClock();
-            console.log("Shot Clock Violation!");
-            // Optionally trigger a buzzer sound here
-            // shotClockEl.style.color = 'orange'; // Example visual cue
         }
-        updateDisplay();
-    };
-
-    const startGameClock = () => {
-        if (!isGameClockRunning && (gameMinutes > 0 || gameSeconds > 0)) {
-            // Clear just in case
+        pushStateToFirebase();
+    }
+    let gameTimerInterval = null;
+    let shotClockTimerInterval = null;
+    function startGameClock() {
+        if (!scoreboardState.isGameClockRunning && (scoreboardState.gameMinutes > 0 || scoreboardState.gameSeconds > 0)) {
             clearInterval(gameTimerInterval);
             gameTimerInterval = setInterval(tickGameClock, 1000);
-            isGameClockRunning = true;
+            scoreboardState.isGameClockRunning = true;
             controlsInfoEl.textContent = "Game Clock RUNNING";
+            pushStateToFirebase();
         }
-    };
-
-    const stopGameClock = () => {
+    }
+    function stopGameClock() {
         clearInterval(gameTimerInterval);
-        isGameClockRunning = false;
-        // --- REMOVED stopShotClock() call from here ---
+        scoreboardState.isGameClockRunning = false;
         controlsInfoEl.textContent = "Game Clock STOPPED";
-    };
-
-    const startShotClock = () => {
-         // Start shot clock regardless of game clock state, if not already running and > 0
-        if (!isShotClockRunning && shotClockSeconds > 0) {
-            // Clear just in case
+        pushStateToFirebase();
+    }
+    function startShotClock() {
+        if (!scoreboardState.isShotClockRunning && scoreboardState.shotClockSeconds > 0) {
             clearInterval(shotClockTimerInterval);
             shotClockTimerInterval = setInterval(tickShotClock, 1000);
-            isShotClockRunning = true;
+            scoreboardState.isShotClockRunning = true;
             shotClockEl.style.backgroundColor = '';
-            shotClockEl.style.color= ''; // Reset to default
-
+            shotClockEl.style.color = '';
+            pushStateToFirebase();
         }
-    };
-
-    const stopShotClock = () => {
+    }
+    function stopShotClock() {
         clearInterval(shotClockTimerInterval);
-        isShotClockRunning = false;
-    };
-
-    const resetGameClock = () => {
+        scoreboardState.isShotClockRunning = false;
+        pushStateToFirebase();
+    }
+    function resetGameClock() {
         if (confirm("Are you sure you want to reset the game clock?")) {
             stopGameClock();
-            // Stop and reset the game over sound if playing
             const gameOverSound = document.getElementById('game-over-sound');
             if (gameOverSound) {
                 gameOverSound.pause();
                 gameOverSound.currentTime = 0;
             }
-            gameMinutes = GAME_CLOCK_FULL;
-            gameSeconds = 0;
-            updateDisplay();
+            scoreboardState.gameMinutes = 10;
+            scoreboardState.gameSeconds = 0;
+            pushStateToFirebase();
             controlsInfoEl.textContent = "Game Clock Reset";
         }
-    };
-
-    const resetShotClock = (time = SHOT_CLOCK_FULL) => {
-
-        shotClockSeconds = time;
-        // shotClockEl.style.color = '#e74c3c'; // Reset color
-        updateDisplay();
+    }
+    function resetShotClock(time = 12) {
+        scoreboardState.shotClockSeconds = time;
         shotClockEl.style.backgroundColor = '';
-        shotClockEl.style.color= ''; 
-        // Optional: Decide if reset should *automatically* restart the shot clock.
-        // Common behaviour: It *might* restart if the game clock is running.
-        // Let's keep that conditional start for convenience after reset.
-        if (isGameClockRunning) {
-           startShotClock();
+        shotClockEl.style.color = '';
+        if (scoreboardState.isGameClockRunning) {
+            startShotClock();
         }
-    };
-
-    // --- Control Functions (adjustScore, adjustFouls, adjustTimeouts, setCustomTime) ---
-    // These functions remain the same as before...
-    const adjustScore = (team, delta) => {
+        pushStateToFirebase();
+    }
+    // --- Control Functions ---
+    function adjustScore(team, delta) {
         if (team === 'home') {
-            homeScore = Math.max(0, Math.min(MAX_SCORE, homeScore + delta));
+            scoreboardState.homeScore = Math.max(0, Math.min(999, scoreboardState.homeScore + delta));
         } else if (team === 'away') {
-            awayScore = Math.max(0, Math.min(MAX_SCORE, awayScore + delta));
+            scoreboardState.awayScore = Math.max(0, Math.min(999, scoreboardState.awayScore + delta));
         }
-        updateDisplay();
-    };
-
-    const adjustFouls = (team, delta) => {
+        pushStateToFirebase();
+    }
+    function adjustFouls(team, delta) {
         if (team === 'home') {
-            homeFouls = Math.max(0, Math.min(MAX_FOULS, homeFouls + delta));
+            scoreboardState.homeFouls = Math.max(0, Math.min(99, scoreboardState.homeFouls + delta));
         } else if (team === 'away') {
-            awayFouls = Math.max(0, Math.min(MAX_FOULS, awayFouls + delta));
+            scoreboardState.awayFouls = Math.max(0, Math.min(99, scoreboardState.awayFouls + delta));
         }
-        updateDisplay();
-    };
-
-     const adjustTimeouts = (team, delta) => {
+        pushStateToFirebase();
+    }
+    function adjustTimeouts(team, delta) {
         if (team === 'home') {
-            homeTimeouts = Math.max(0, Math.min(MAX_TIMEOUTS, homeTimeouts + delta));
+            scoreboardState.homeTimeouts = Math.max(0, Math.min(9, scoreboardState.homeTimeouts + delta));
         } else if (team === 'away') {
-            awayTimeouts = Math.max(0, Math.min(MAX_TIMEOUTS, awayTimeouts + delta));
+            scoreboardState.awayTimeouts = Math.max(0, Math.min(9, scoreboardState.awayTimeouts + delta));
         }
-        updateDisplay();
-    };
-
-    const setCustomTime = () => {
-        stopGameClock(); // Stop clock before setting
-        const timeInput = prompt("Enter game time (MM:SS):", `${String(gameMinutes).padStart(2, '0')}:${String(gameSeconds).padStart(2, '0')}`);
+        pushStateToFirebase();
+    }
+    function setCustomTime() {
+        stopGameClock();
+        const timeInput = prompt("Enter game time (MM:SS):", `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`);
         if (timeInput) {
             const parts = timeInput.split(':');
             if (parts.length === 2) {
                 const mins = parseInt(parts[0], 10);
                 const secs = parseInt(parts[1], 10);
                 if (!isNaN(mins) && !isNaN(secs) && mins >= 0 && secs >= 0 && secs < 60) {
-                    gameMinutes = mins;
-                    gameSeconds = secs;
-                    updateDisplay();
+                    scoreboardState.gameMinutes = mins;
+                    scoreboardState.gameSeconds = secs;
+                    pushStateToFirebase();
                 } else {
                     alert("Invalid time format. Please use MM:SS.");
                 }
             } else {
-                 alert("Invalid time format. Please use MM:SS.");
+                alert("Invalid time format. Please use MM:SS.");
             }
         }
-         // Keep game clock stopped after setting
         controlsInfoEl.textContent = "Game Clock STOPPED";
     }
-
-
     // --- Help Modal Functions (showHelp, hideHelp) ---
     // These remain the same...
      const showHelp = () => {
@@ -227,11 +209,11 @@ document.addEventListener('DOMContentLoaded', () => {
         helpModal.style.display = 'none';
     };
 
-    // --- Mouse Event Listeners ---
+    // --- Keyboard and Mouse Event Listeners ---
     document.addEventListener('mousedown', (e) => {
         if (e.button === 2) { // Right click
             e.preventDefault();
-            if (isShotClockRunning) {
+            if (scoreboardState.isShotClockRunning) {
                 stopShotClock();
             } else {
                 startShotClock();
@@ -251,14 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- MODIFIED Clock Controls ---
         if (e.code === 'KeyT') { // Game Clock Toggle
-            if (isGameClockRunning) {
+            if (scoreboardState.isGameClockRunning) {
                 stopGameClock();
             } else {
                 startGameClock();
             }
         }
         else if (e.code === 'Space' && !e.shiftKey) { // Shot Clock Toggle
-             if (isShotClockRunning) {
+             if (scoreboardState.isShotClockRunning) {
                  stopShotClock();
              } else {
                  startShotClock(); // Will only start if > 0 seconds
@@ -267,10 +249,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- END MODIFIED Clock Controls ---
 
         else if (e.code === 'KeyR' && !e.shiftKey) { // 'r' - Reset Shot Clock (Full)
-            resetShotClock(SHOT_CLOCK_FULL);
+            resetShotClock(12);
         }
          else if (e.code === 'KeyR' && e.shiftKey) { // Shift + 'r' - Reset Shot Clock (O.Reb)
-            resetShotClock(SHOT_CLOCK_OREB);
+            resetShotClock(12);
         }
 
         // Score Controls
@@ -292,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyX' && e.shiftKey) { adjustTimeouts('away', 1); }
         // --- Custom Shot Clock Key ---
         else if (e.code === 'KeyC' && e.shiftKey) { // 'c' - Set Custom Shot Clock
-            let custom = prompt('Enter custom shot clock (seconds):', shotClockSeconds);
+            let custom = prompt('Enter custom shot clock (seconds):', scoreboardState.shotClockSeconds);
             if (custom !== null) {
                 let val = parseInt(custom, 10);
                 if (!isNaN(val) && val > 0 && val <= 99) {
