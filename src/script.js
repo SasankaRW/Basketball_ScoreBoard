@@ -277,16 +277,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function tickShotClock() {
         if (scoreboardState.shotClockSeconds > 0) {
             scoreboardState.shotClockSeconds--;
+            
+            // Play shot clock buzzer when it reaches 1 second (not 0)
+            if (scoreboardState.shotClockSeconds === 0) {
+                const shotClockSound = document.getElementById('shotclock-sound');
+                if (shotClockSound) {
+                    shotClockSound.currentTime = 0;
+                    shotClockSound.play().catch(() => {
+                        // Handle autoplay restrictions silently
+                    });
+                }
+            }
         } else {
             stopShotClock();
-            // Play shot clock buzzer when it reaches zero
-            const shotClockSound = document.getElementById('shotclock-sound');
-            if (shotClockSound) {
-                shotClockSound.currentTime = 0;
-                shotClockSound.play().catch(() => {
-                    // Handle autoplay restrictions silently
-                });
-            }
         }
         pushStateToFirebase();
     }
