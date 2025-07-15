@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isAuthenticated) {
             return callback();
         } else {
-            showLoginModal();
+            // Don't show login modal automatically - user must press 'L' key
             return false;
         }
     }
@@ -264,8 +264,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             stopGameClock();
             const gameOverSound = document.getElementById('game-over-sound');
-            gameOverSound.currentTime = 0; 
-            gameOverSound.play().catch(() => {});
+            if (gameOverSound) {
+                gameOverSound.currentTime = 0; 
+                gameOverSound.play().catch(() => {
+                    // Handle autoplay restrictions silently
+                });
+            }
             alert("Game Over!");
         }
         pushStateToFirebase();
@@ -275,6 +279,14 @@ document.addEventListener('DOMContentLoaded', () => {
             scoreboardState.shotClockSeconds--;
         } else {
             stopShotClock();
+            // Play shot clock buzzer when it reaches zero
+            const shotClockSound = document.getElementById('shotclock-sound');
+            if (shotClockSound) {
+                shotClockSound.currentTime = 0;
+                shotClockSound.play().catch(() => {
+                    // Handle autoplay restrictions silently
+                });
+            }
         }
         pushStateToFirebase();
     }
@@ -727,11 +739,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Sound Initialization ---
+    function initializeSounds() {
+        // Pre-load and enable sounds after user interaction
+        const gameOverSound = document.getElementById('game-over-sound');
+        const shotClockSound = document.getElementById('shotclock-sound');
+        
+        if (gameOverSound) {
+            gameOverSound.volume = 0.7;
+            gameOverSound.load();
+        }
+        
+        if (shotClockSound) {
+            shotClockSound.volume = 0.8;
+            shotClockSound.load();
+        }
+    }
+
     // --- Initial Setup ---
     updateDisplay();
 
     // Initialize authentication
     checkAuthentication();
+    
+    // Initialize sounds on first user interaction
+    document.addEventListener('click', function initSounds() {
+        initializeSounds();
+        document.removeEventListener('click', initSounds);
+    }, { once: true });
+    
+    document.addEventListener('keydown', function initSounds() {
+        initializeSounds();
+        document.removeEventListener('keydown', initSounds);
+    }, { once: true });
 });
 
 // Remove editTeamName function and old keydown for 'n'/'N', replace with unified hotkey logic
