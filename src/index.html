@@ -14,9 +14,13 @@
             <div class="team-name" id="home-team-name" tabindex="0">HOME</div>
             <div class="score" id="home-score">00</div>
             <div class="stats">
-                <div class="stat-line">
+                <div class="stat-line foul">
                     <span class="label">FOULS</span>
                     <span class="value" id="home-fouls">0</span>
+                </div>
+                <div class="stat-line timeout">
+                    <span class="label">TIMEOUTS</span>
+                    <span class="value" id="home-timeouts">2</span>
                 </div>
             </div>
         </div>
@@ -42,9 +46,13 @@
             <div class="team-name" id="away-team-name" tabindex="0">AWAY</div>
             <div class="score" id="away-score">00</div>
             <div class="stats">
-                <div class="stat-line">
+                <div class="stat-line foul">
                     <span class="label">FOULS</span>
                     <span class="value" id="away-fouls">0</span>
+                </div>
+                <div class="stat-line timeout">
+                    <span class="label">TIMEOUTS</span>
+                    <span class="value" id="away-timeouts">2</span>
                 </div>
             </div>
         </div>
@@ -74,11 +82,136 @@
                 <li><strong>J:</strong> Away Fouls +1</li>
                 <li><strong>Shift + J:</strong> Away Fouls -1</li>
                 <hr>
+                <h2>Timeouts</h2>
+                <li><strong>Z:</strong> Home Timeouts -1</li>
+                <li><strong>Shift + Z:</strong> Home Timeouts +1</li>
+                <li><strong>X:</strong> Away Timeouts -1</li>
+                <li><strong>Shift + X:</strong> Away Timeouts +1</li>
+                <hr>
                 <li><strong>Shift + C:</strong> Set Custom Shot Clock (prompts for seconds)</li>
                 <li><strong>Enter:</strong> Set Custom Game Time (prompts)</li>
                 <li><strong>N:</strong> Set Custom Team Names</li>
                 <li><strong>H:</strong> Show/Hide This Help</li>
+                <li><strong>C:</strong> Show Control Panel</li>
             </ul>
+        </div>
+    </div>
+
+    <!-- Control Panel Modal -->
+    <div id="control-panel-modal" class="modal">
+        <div class="modal-content control-panel">
+            <span class="close-button" id="control-close-button">×</span>
+            <h2>Control Panel</h2>
+            
+            <div class="control-section">
+                <h3>Team Names</h3>
+                <div class="input-group">
+                    <label for="home-team-input">Home Team:</label>
+                    <input type="text" id="home-team-input" placeholder="Home Team Name">
+                </div>
+                <div class="input-group">
+                    <label for="away-team-input">Away Team:</label>
+                    <input type="text" id="away-team-input" placeholder="Away Team Name">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Scores</h3>
+                <div class="input-group">
+                    <label for="home-score-input">Home Score:</label>
+                    <input type="number" id="home-score-input" min="0" max="999" placeholder="0">
+                </div>
+                <div class="input-group">
+                    <label for="away-score-input">Away Score:</label>
+                    <input type="number" id="away-score-input" min="0" max="999" placeholder="0">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Fouls</h3>
+                <div class="input-group">
+                    <label for="home-fouls-input">Home Fouls:</label>
+                    <input type="number" id="home-fouls-input" min="0" max="99" placeholder="0">
+                </div>
+                <div class="input-group">
+                    <label for="away-fouls-input">Away Fouls:</label>
+                    <input type="number" id="away-fouls-input" min="0" max="99" placeholder="0">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Timeouts</h3>
+                <div class="input-group">
+                    <label for="home-timeouts-input">Home Timeouts:</label>
+                    <input type="number" id="home-timeouts-input" min="0" max="99" placeholder="2">
+                </div>
+                <div class="input-group">
+                    <label for="away-timeouts-input">Away Timeouts:</label>
+                    <input type="number" id="away-timeouts-input" min="0" max="99" placeholder="2">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Game Clock</h3>
+                <div class="input-group">
+                    <label for="game-minutes-input">Minutes:</label>
+                    <input type="number" id="game-minutes-input" min="0" max="99" placeholder="10">
+                </div>
+                <div class="input-group">
+                    <label for="game-seconds-input">Seconds:</label>
+                    <input type="number" id="game-seconds-input" min="0" max="59" placeholder="0">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Shot Clock</h3>
+                <div class="input-group">
+                    <label for="shot-clock-input">Seconds:</label>
+                    <input type="number" id="shot-clock-input" min="0" max="99" placeholder="12">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Default Settings</h3>
+                <div class="input-group">
+                    <label for="default-game-minutes">Default Game Minutes:</label>
+                    <input type="number" id="default-game-minutes" min="1" max="99" placeholder="10">
+                </div>
+                <div class="input-group">
+                    <label for="default-shot-clock">Default Shot Clock:</label>
+                    <input type="number" id="default-shot-clock" min="1" max="99" placeholder="12">
+                </div>
+                <div class="input-group">
+                    <label for="default-timeouts">Default Timeouts:</label>
+                    <input type="number" id="default-timeouts" min="0" max="99" placeholder="2">
+                </div>
+                <div class="input-group">
+                    <label for="default-home-team">Default Home Team:</label>
+                    <input type="text" id="default-home-team" placeholder="HOME">
+                </div>
+                <div class="input-group">
+                    <label for="default-away-team">Default Away Team:</label>
+                    <input type="text" id="default-away-team" placeholder="AWAY">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Clock Controls</h3>
+                <div class="button-group">
+                    <button id="start-game-clock">Start Game Clock</button>
+                    <button id="stop-game-clock">Stop Game Clock</button>
+                    <button id="start-shot-clock">Start Shot Clock</button>
+                    <button id="stop-shot-clock">Stop Shot Clock</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="button-group">
+                    <button id="apply-changes" class="primary-button">Apply Changes</button>
+                    <button id="reset-all" class="danger-button">Reset All</button>
+                    <button id="apply-defaults" class="secondary-button">Apply Defaults</button>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -27,9 +27,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const shotClockEl = document.getElementById('shot-clock');
     const homeFoulsEl = document.getElementById('home-fouls');
     const awayFoulsEl = document.getElementById('away-fouls');
+    const homeTimeoutsEl = document.getElementById('home-timeouts');
+    const awayTimeoutsEl = document.getElementById('away-timeouts');
     const helpModal = document.getElementById('help-modal');
     const closeModalBtn = document.querySelector('.close-button');
     const controlsInfoEl = document.getElementById('controls-info');
+
+    // Control Panel Elements
+    const controlPanelModal = document.getElementById('control-panel-modal');
+    const controlCloseBtn = document.getElementById('control-close-button');
+    const homeTeamInput = document.getElementById('home-team-input');
+    const awayTeamInput = document.getElementById('away-team-input');
+    const homeScoreInput = document.getElementById('home-score-input');
+    const awayScoreInput = document.getElementById('away-score-input');
+    const homeFoulsInput = document.getElementById('home-fouls-input');
+    const awayFoulsInput = document.getElementById('away-fouls-input');
+    const homeTimeoutsInput = document.getElementById('home-timeouts-input');
+    const awayTimeoutsInput = document.getElementById('away-timeouts-input');
+    const gameMinutesInput = document.getElementById('game-minutes-input');
+    const gameSecondsInput = document.getElementById('game-seconds-input');
+    const shotClockInput = document.getElementById('shot-clock-input');
+    const applyChangesBtn = document.getElementById('apply-changes');
+    const resetAllBtn = document.getElementById('reset-all');
+    const startGameClockBtn = document.getElementById('start-game-clock');
+    const stopGameClockBtn = document.getElementById('stop-game-clock');
+    const startShotClockBtn = document.getElementById('start-shot-clock');
+    const stopShotClockBtn = document.getElementById('stop-shot-clock');
+    
+    // Default Settings Elements
+    const defaultGameMinutesInput = document.getElementById('default-game-minutes');
+    const defaultShotClockInput = document.getElementById('default-shot-clock');
+    const defaultTimeoutsInput = document.getElementById('default-timeouts');
+    const defaultHomeTeamInput = document.getElementById('default-home-team');
+    const defaultAwayTeamInput = document.getElementById('default-away-team');
+    const applyDefaultsBtn = document.getElementById('apply-defaults');
 
     // --- State Object ---
     let scoreboardState = {
@@ -37,11 +68,21 @@ document.addEventListener('DOMContentLoaded', () => {
         awayScore: 0,
         homeFouls: 0,
         awayFouls: 0,
+        homeTimeouts: 2,
+        awayTimeouts: 2,
+        homeTeamName: "HOME",
+        awayTeamName: "AWAY",
         gameMinutes: 10,
         gameSeconds: 0,
         shotClockSeconds: 12,
         isGameClockRunning: false,
-        isShotClockRunning: false
+        isShotClockRunning: false,
+        // Default Settings
+        defaultGameMinutes: 10,
+        defaultShotClock: 12,
+        defaultTimeouts: 2,
+        defaultHomeTeam: "HOME",
+        defaultAwayTeam: "AWAY"
     };
 
     // --- Firebase Setup ---
@@ -55,6 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (shotClockEl) shotClockEl.textContent = String(scoreboardState.shotClockSeconds).padStart(2, '0');
         if (homeFoulsEl) homeFoulsEl.textContent = scoreboardState.homeFouls;
         if (awayFoulsEl) awayFoulsEl.textContent = scoreboardState.awayFouls;
+        if (homeTimeoutsEl) homeTimeoutsEl.textContent = scoreboardState.homeTimeouts;
+        if (awayTimeoutsEl) awayTimeoutsEl.textContent = scoreboardState.awayTimeouts;
+        
+        // Update team names
+        const homeTeamNameEl = document.getElementById('home-team-name');
+        const awayTeamNameEl = document.getElementById('away-team-name');
+        if (homeTeamNameEl) homeTeamNameEl.textContent = scoreboardState.homeTeamName;
+        if (awayTeamNameEl) awayTeamNameEl.textContent = scoreboardState.awayTeamName;
     };
 
     // --- Firebase Sync ---
@@ -81,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             stopGameClock();
             const gameOverSound = document.getElementById('game-over-sound');
-            gameOverSound.currentTime = 0;
+            gameOverSound.currentTime = 0; 
             gameOverSound.play().catch(() => {});
             alert("Game Over!");
         }
@@ -118,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
             shotClockTimerInterval = setInterval(tickShotClock, 1000);
             scoreboardState.isShotClockRunning = true;
             if (shotClockEl) {
-                shotClockEl.style.backgroundColor = '';
+            shotClockEl.style.backgroundColor = '';
                 shotClockEl.style.color = '';
             }
             pushStateToFirebase();
@@ -146,11 +195,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetShotClock(time = 12) {
         scoreboardState.shotClockSeconds = time;
         if (shotClockEl) {
-            shotClockEl.style.backgroundColor = '';
+        shotClockEl.style.backgroundColor = '';
             shotClockEl.style.color = '';
         }
         if (scoreboardState.isGameClockRunning) {
-            startShotClock();
+           startShotClock();
         }
         pushStateToFirebase();
     }
@@ -171,6 +220,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         pushStateToFirebase();
     }
+    function adjustTimeouts(team, delta) {
+        if (team === 'home') {
+            scoreboardState.homeTimeouts = Math.max(0, Math.min(99, scoreboardState.homeTimeouts + delta));
+        } else if (team === 'away') {
+            scoreboardState.awayTimeouts = Math.max(0, Math.min(99, scoreboardState.awayTimeouts + delta));
+        }
+        pushStateToFirebase();
+    }
     function setCustomTime() {
         stopGameClock();
         const timeInput = prompt("Enter game time (MM:SS):", `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`);
@@ -187,10 +244,149 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert("Invalid time format. Please use MM:SS.");
                 }
             } else {
-                alert("Invalid time format. Please use MM:SS.");
+                 alert("Invalid time format. Please use MM:SS.");
             }
         }
         if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock STOPPED";
+    }
+
+    // --- Team Name Functions ---
+    function setTeamNames() {
+        const homeName = prompt("Enter Home Team Name:", scoreboardState.homeTeamName);
+        if (homeName !== null) {
+            scoreboardState.homeTeamName = homeName.trim() || "HOME";
+        }
+        
+        const awayName = prompt("Enter Away Team Name:", scoreboardState.awayTeamName);
+        if (awayName !== null) {
+            scoreboardState.awayTeamName = awayName.trim() || "AWAY";
+        }
+        
+        pushStateToFirebase();
+    }
+
+    // --- Control Panel Functions ---
+    function showControlPanel() {
+        if (controlPanelModal) {
+            populateControlPanel();
+            controlPanelModal.style.display = 'block';
+        }
+    }
+
+    function hideControlPanel() {
+        if (controlPanelModal) {
+            controlPanelModal.style.display = 'none';
+        }
+    }
+
+    function populateControlPanel() {
+        if (homeTeamInput) homeTeamInput.value = scoreboardState.homeTeamName;
+        if (awayTeamInput) awayTeamInput.value = scoreboardState.awayTeamName;
+        if (homeScoreInput) homeScoreInput.value = scoreboardState.homeScore;
+        if (awayScoreInput) awayScoreInput.value = scoreboardState.awayScore;
+        if (homeFoulsInput) homeFoulsInput.value = scoreboardState.homeFouls;
+        if (awayFoulsInput) awayFoulsInput.value = scoreboardState.awayFouls;
+        if (homeTimeoutsInput) homeTimeoutsInput.value = scoreboardState.homeTimeouts;
+        if (awayTimeoutsInput) awayTimeoutsInput.value = scoreboardState.awayTimeouts;
+        if (gameMinutesInput) gameMinutesInput.value = scoreboardState.gameMinutes;
+        if (gameSecondsInput) gameSecondsInput.value = scoreboardState.gameSeconds;
+        if (shotClockInput) shotClockInput.value = scoreboardState.shotClockSeconds;
+        
+        // Populate default settings
+        if (defaultGameMinutesInput) defaultGameMinutesInput.value = scoreboardState.defaultGameMinutes;
+        if (defaultShotClockInput) defaultShotClockInput.value = scoreboardState.defaultShotClock;
+        if (defaultTimeoutsInput) defaultTimeoutsInput.value = scoreboardState.defaultTimeouts;
+        if (defaultHomeTeamInput) defaultHomeTeamInput.value = scoreboardState.defaultHomeTeam;
+        if (defaultAwayTeamInput) defaultAwayTeamInput.value = scoreboardState.defaultAwayTeam;
+    }
+
+    function applyControlPanelChanges() {
+        // Update team names
+        if (homeTeamInput) scoreboardState.homeTeamName = homeTeamInput.value.trim() || "HOME";
+        if (awayTeamInput) scoreboardState.awayTeamName = awayTeamInput.value.trim() || "AWAY";
+        
+        // Update scores
+        if (homeScoreInput) scoreboardState.homeScore = Math.max(0, Math.min(999, parseInt(homeScoreInput.value) || 0));
+        if (awayScoreInput) scoreboardState.awayScore = Math.max(0, Math.min(999, parseInt(awayScoreInput.value) || 0));
+        
+        // Update fouls
+        if (homeFoulsInput) scoreboardState.homeFouls = Math.max(0, Math.min(99, parseInt(homeFoulsInput.value) || 0));
+        if (awayFoulsInput) scoreboardState.awayFouls = Math.max(0, Math.min(99, parseInt(awayFoulsInput.value) || 0));
+        
+        // Update timeouts
+        if (homeTimeoutsInput) scoreboardState.homeTimeouts = Math.max(0, Math.min(99, parseInt(homeTimeoutsInput.value) || 0));
+        if (awayTimeoutsInput) scoreboardState.awayTimeouts = Math.max(0, Math.min(99, parseInt(awayTimeoutsInput.value) || 0));
+        
+        // Update game clock
+        if (gameMinutesInput) scoreboardState.gameMinutes = Math.max(0, Math.min(99, parseInt(gameMinutesInput.value) || 0));
+        if (gameSecondsInput) scoreboardState.gameSeconds = Math.max(0, Math.min(59, parseInt(gameSecondsInput.value) || 0));
+        
+        // Update shot clock
+        if (shotClockInput) scoreboardState.shotClockSeconds = Math.max(0, Math.min(99, parseInt(shotClockInput.value) || 0));
+        
+        // Update default settings
+        if (defaultGameMinutesInput) scoreboardState.defaultGameMinutes = Math.max(1, Math.min(99, parseInt(defaultGameMinutesInput.value) || 10));
+        if (defaultShotClockInput) scoreboardState.defaultShotClock = Math.max(1, Math.min(99, parseInt(defaultShotClockInput.value) || 12));
+        if (defaultTimeoutsInput) scoreboardState.defaultTimeouts = Math.max(0, Math.min(99, parseInt(defaultTimeoutsInput.value) || 2));
+        if (defaultHomeTeamInput) scoreboardState.defaultHomeTeam = defaultHomeTeamInput.value.trim() || "HOME";
+        if (defaultAwayTeamInput) scoreboardState.defaultAwayTeam = defaultAwayTeamInput.value.trim() || "AWAY";
+        
+        pushStateToFirebase();
+        hideControlPanel();
+    }
+
+    function applyDefaults() {
+        if (confirm("Apply default settings to current game? This will reset the current game data.")) {
+            // Stop any running clocks
+            stopGameClock();
+            stopShotClock();
+            
+            // Apply default settings to current game
+            scoreboardState.homeScore = 0;
+            scoreboardState.awayScore = 0;
+            scoreboardState.homeFouls = 0;
+            scoreboardState.awayFouls = 0;
+            scoreboardState.homeTimeouts = scoreboardState.defaultTimeouts;
+            scoreboardState.awayTimeouts = scoreboardState.defaultTimeouts;
+            scoreboardState.homeTeamName = scoreboardState.defaultHomeTeam;
+            scoreboardState.awayTeamName = scoreboardState.defaultAwayTeam;
+            scoreboardState.gameMinutes = scoreboardState.defaultGameMinutes;
+            scoreboardState.gameSeconds = 0;
+            scoreboardState.shotClockSeconds = scoreboardState.defaultShotClock;
+            scoreboardState.isGameClockRunning = false;
+            scoreboardState.isShotClockRunning = false;
+            
+            pushStateToFirebase();
+            hideControlPanel();
+        }
+    }
+
+    function resetAllData() {
+        if (confirm("Are you sure you want to reset all data? This will set everything back to default values.")) {
+            scoreboardState = {
+                homeScore: 0,
+                awayScore: 0,
+                homeFouls: 0,
+                awayFouls: 0,
+                homeTimeouts: scoreboardState.defaultTimeouts,
+                awayTimeouts: scoreboardState.defaultTimeouts,
+                homeTeamName: scoreboardState.defaultHomeTeam,
+                awayTeamName: scoreboardState.defaultAwayTeam,
+                gameMinutes: scoreboardState.defaultGameMinutes,
+                gameSeconds: 0,
+                shotClockSeconds: scoreboardState.defaultShotClock,
+                isGameClockRunning: false,
+                isShotClockRunning: false,
+                // Preserve default settings
+                defaultGameMinutes: scoreboardState.defaultGameMinutes,
+                defaultShotClock: scoreboardState.defaultShotClock,
+                defaultTimeouts: scoreboardState.defaultTimeouts,
+                defaultHomeTeam: scoreboardState.defaultHomeTeam,
+                defaultAwayTeam: scoreboardState.defaultAwayTeam
+            };
+            pushStateToFirebase();
+            hideControlPanel();
+        }
     }
     // --- Help Modal Functions ---
      const showHelp = () => {
@@ -216,8 +412,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Keyboard Event Listener ---
     document.addEventListener('keydown', (e) => {
-        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY'].includes(e.code))) {
-         
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX'].includes(e.code))) {
+
         }
 
         // --- Clock Controls ---
@@ -254,6 +450,12 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyJ' && !e.shiftKey) { adjustFouls('away', 1); }
         else if (e.code === 'KeyJ' && e.shiftKey) { adjustFouls('away', -1); }
 
+         // Timeout Controls
+        else if (e.code === 'KeyZ' && !e.shiftKey) { adjustTimeouts('home', -1); }
+        else if (e.code === 'KeyZ' && e.shiftKey) { adjustTimeouts('home', 1); }
+        else if (e.code === 'KeyX' && !e.shiftKey) { adjustTimeouts('away', -1); }
+        else if (e.code === 'KeyX' && e.shiftKey) { adjustTimeouts('away', 1); }
+
         // --- Custom Shot Clock Key ---
         else if (e.code === 'KeyC' && e.shiftKey) { // 'c' - Set Custom Shot Clock
             let custom = prompt('Enter custom shot clock (seconds):', scoreboardState.shotClockSeconds);
@@ -277,6 +479,27 @@ document.addEventListener('DOMContentLoaded', () => {
                  showHelp();
              }
         }
+        else if (e.code === 'KeyC') { // 'c' - Show Control Panel
+            showControlPanel();
+        }
+        else if (e.code === 'N' || e.code === 'n') { // 'n' - Set Team Names
+            setTeamNames();
+        }
+        else if (e.code === 'P' || e.code === 'p') { // 'p' - Show Control Panel
+            showControlPanel();
+        }
+        else if (e.code === 'O' || e.code === 'o') { // 'o' - Hide Control Panel
+            hideControlPanel();
+        }
+        else if (e.code === 'R' || e.code === 'r') { // 'r' - Apply Control Panel Changes
+            applyControlPanelChanges();
+        }
+        else if (e.code === 'A' || e.code === 'a') { // 'a' - Reset All Data
+            resetAllData();
+        }
+        else if (e.code === 'D' || e.code === 'd') { // 'd' - Apply Defaults
+            applyDefaults();
+        }
     });
 
      // --- Modal Event Listeners ---
@@ -285,7 +508,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target === helpModal) {
             hideHelp();
         }
+        if (event.target === controlPanelModal) {
+            hideControlPanel();
+        }
     });
+
+    // --- Control Panel Event Listeners ---
+    if (controlCloseBtn) controlCloseBtn.addEventListener('click', hideControlPanel);
+    if (applyChangesBtn) applyChangesBtn.addEventListener('click', applyControlPanelChanges);
+    if (resetAllBtn) resetAllBtn.addEventListener('click', resetAllData);
+    if (startGameClockBtn) startGameClockBtn.addEventListener('click', startGameClock);
+    if (stopGameClockBtn) stopGameClockBtn.addEventListener('click', stopGameClock);
+    if (startShotClockBtn) startShotClockBtn.addEventListener('click', startShotClock);
+    if (stopShotClockBtn) stopShotClockBtn.addEventListener('click', stopShotClock);
+    if (applyDefaultsBtn) applyDefaultsBtn.addEventListener('click', applyDefaults);
 
     // --- Initial Setup ---
     updateDisplay();
