@@ -19,7 +19,7 @@
                     <span class="value" id="home-fouls">0</span>
                 </div>
                 <div class="stat-line timeout">
-                    <span class="label">TIMEOUTS</span>
+                    <span class="label">TIMEOUTS LEFT</span>
                     <span class="value" id="home-timeouts">2</span>
                 </div>
             </div>
@@ -51,9 +51,31 @@
                     <span class="value" id="away-fouls">0</span>
                 </div>
                 <div class="stat-line timeout">
-                    <span class="label">TIMEOUTS</span>
+                    <span class="label">TIMEOUTS LEFT</span>
                     <span class="value" id="away-timeouts">2</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content login-panel">
+            <h2>Scoreboard Login</h2>
+            <div class="login-form">
+                <div class="input-group">
+                    <label for="username-input">Username:</label>
+                    <input type="text" id="username-input" placeholder="Enter username">
+                </div>
+                <div class="input-group">
+                    <label for="password-input">Password:</label>
+                    <input type="password" id="password-input" placeholder="Enter password">
+                </div>
+                <div class="button-group">
+                    <button id="login-btn" class="primary-button">Login</button>
+                    <button id="logout-btn" class="secondary-button" style="display: none;">Logout</button>
+                </div>
+                <div id="login-status" class="login-status"></div>
             </div>
         </div>
     </div>
@@ -93,6 +115,7 @@
                 <li><strong>N:</strong> Set Custom Team Names</li>
                 <li><strong>H:</strong> Show/Hide This Help</li>
                 <li><strong>C:</strong> Show Control Panel</li>
+                <li><strong>L:</strong> Show Login</li>
             </ul>
         </div>
     </div>
