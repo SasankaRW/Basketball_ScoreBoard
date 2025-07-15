@@ -5,18 +5,17 @@ import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebase
 const firebaseConfig = {
   apiKey: "AIzaSyB0I8H2bAIFMMB01n-4p-G3ogxbmp3Nii8",
   authDomain: "basketballscoreboard-65c95.firebaseapp.com",
+  databaseURL: "https://basketballscoreboard-65c95-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "basketballscoreboard-65c95",
   storageBucket: "basketballscoreboard-65c95.firebasestorage.app",
   messagingSenderId: "31697951521",
   appId: "1:31697951521:web:074259ad89964d30437c60"
-};
+};c
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const stateRef = ref(db, 'scoreboardState');
 
-// --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
     // Prevent context menu on right click for the entire document
     document.addEventListener('contextmenu', e => e.preventDefault());
@@ -28,8 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const shotClockEl = document.getElementById('shot-clock');
     const homeFoulsEl = document.getElementById('home-fouls');
     const awayFoulsEl = document.getElementById('away-fouls');
-    const homeTimeoutsEl = document.getElementById('home-timeouts');
-    const awayTimeoutsEl = document.getElementById('away-timeouts');
     const helpModal = document.getElementById('help-modal');
     const closeModalBtn = document.querySelector('.close-button');
     const controlsInfoEl = document.getElementById('controls-info');
@@ -40,8 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
         awayScore: 0,
         homeFouls: 0,
         awayFouls: 0,
-        homeTimeouts: 2,
-        awayTimeouts: 2,
         gameMinutes: 10,
         gameSeconds: 0,
         shotClockSeconds: 12,
@@ -49,16 +44,17 @@ document.addEventListener('DOMContentLoaded', () => {
         isShotClockRunning: false
     };
 
+    // --- Firebase Setup ---
+    const stateRef = ref(db, 'scoreboardState');
+
     // --- Update Functions ---
     const updateDisplay = () => {
-        homeScoreEl.textContent = String(scoreboardState.homeScore).padStart(2, '0');
-        awayScoreEl.textContent = String(scoreboardState.awayScore).padStart(2, '0');
-        gameClockEl.textContent = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
-        shotClockEl.textContent = String(scoreboardState.shotClockSeconds).padStart(2, '0');
-        homeFoulsEl.textContent = scoreboardState.homeFouls;
-        awayFoulsEl.textContent = scoreboardState.awayFouls;
-        homeTimeoutsEl.textContent = scoreboardState.homeTimeouts;
-        awayTimeoutsEl.textContent = scoreboardState.awayTimeouts;
+        if (homeScoreEl) homeScoreEl.textContent = String(scoreboardState.homeScore).padStart(2, '0');
+        if (awayScoreEl) awayScoreEl.textContent = String(scoreboardState.awayScore).padStart(2, '0');
+        if (gameClockEl) gameClockEl.textContent = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
+        if (shotClockEl) shotClockEl.textContent = String(scoreboardState.shotClockSeconds).padStart(2, '0');
+        if (homeFoulsEl) homeFoulsEl.textContent = scoreboardState.homeFouls;
+        if (awayFoulsEl) awayFoulsEl.textContent = scoreboardState.awayFouls;
     };
 
     // --- Firebase Sync ---
@@ -106,14 +102,14 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(gameTimerInterval);
             gameTimerInterval = setInterval(tickGameClock, 1000);
             scoreboardState.isGameClockRunning = true;
-            controlsInfoEl.textContent = "Game Clock RUNNING";
+            if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock RUNNING";
             pushStateToFirebase();
         }
     }
     function stopGameClock() {
         clearInterval(gameTimerInterval);
         scoreboardState.isGameClockRunning = false;
-        controlsInfoEl.textContent = "Game Clock STOPPED";
+        if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock STOPPED";
         pushStateToFirebase();
     }
     function startShotClock() {
@@ -121,8 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(shotClockTimerInterval);
             shotClockTimerInterval = setInterval(tickShotClock, 1000);
             scoreboardState.isShotClockRunning = true;
-            shotClockEl.style.backgroundColor = '';
-            shotClockEl.style.color = '';
+            if (shotClockEl) {
+                shotClockEl.style.backgroundColor = '';
+                shotClockEl.style.color = '';
+            }
             pushStateToFirebase();
         }
     }
@@ -142,13 +140,15 @@ document.addEventListener('DOMContentLoaded', () => {
             scoreboardState.gameMinutes = 10;
             scoreboardState.gameSeconds = 0;
             pushStateToFirebase();
-            controlsInfoEl.textContent = "Game Clock Reset";
+            if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock Reset";
         }
     }
     function resetShotClock(time = 12) {
         scoreboardState.shotClockSeconds = time;
-        shotClockEl.style.backgroundColor = '';
-        shotClockEl.style.color = '';
+        if (shotClockEl) {
+            shotClockEl.style.backgroundColor = '';
+            shotClockEl.style.color = '';
+        }
         if (scoreboardState.isGameClockRunning) {
             startShotClock();
         }
@@ -171,14 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         pushStateToFirebase();
     }
-    function adjustTimeouts(team, delta) {
-        if (team === 'home') {
-            scoreboardState.homeTimeouts = Math.max(0, Math.min(9, scoreboardState.homeTimeouts + delta));
-        } else if (team === 'away') {
-            scoreboardState.awayTimeouts = Math.max(0, Math.min(9, scoreboardState.awayTimeouts + delta));
-        }
-        pushStateToFirebase();
-    }
     function setCustomTime() {
         stopGameClock();
         const timeInput = prompt("Enter game time (MM:SS):", `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`);
@@ -198,18 +190,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Invalid time format. Please use MM:SS.");
             }
         }
-        controlsInfoEl.textContent = "Game Clock STOPPED";
+        if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock STOPPED";
     }
-    // --- Help Modal Functions (showHelp, hideHelp) ---
-    // These remain the same...
+    // --- Help Modal Functions ---
      const showHelp = () => {
-        helpModal.style.display = 'block';
+        if (helpModal) helpModal.style.display = 'block';
     };
     const hideHelp = () => {
-        helpModal.style.display = 'none';
+        if (helpModal) helpModal.style.display = 'none';
     };
 
-    // --- Keyboard and Mouse Event Listeners ---
+    // --- Mouse Event Listeners ---
     document.addEventListener('mousedown', (e) => {
         if (e.button === 2) { // Right click
             e.preventDefault();
@@ -225,13 +216,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Keyboard Event Listener ---
     document.addEventListener('keydown', (e) => {
-        // console.log(e.key, e.code, e.shiftKey); // Debugging
-
         if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY'].includes(e.code))) {
-             e.preventDefault();
+         
         }
 
-        // --- MODIFIED Clock Controls ---
+        // --- Clock Controls ---
         if (e.code === 'KeyT') { // Game Clock Toggle
             if (scoreboardState.isGameClockRunning) {
                 stopGameClock();
@@ -243,11 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
              if (scoreboardState.isShotClockRunning) {
                  stopShotClock();
              } else {
-                 startShotClock(); // Will only start if > 0 seconds
+                 startShotClock();
              }
         }
-        // --- END MODIFIED Clock Controls ---
-
         else if (e.code === 'KeyR' && !e.shiftKey) { // 'r' - Reset Shot Clock (Full)
             resetShotClock(12);
         }
@@ -267,11 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyJ' && !e.shiftKey) { adjustFouls('away', 1); }
         else if (e.code === 'KeyJ' && e.shiftKey) { adjustFouls('away', -1); }
 
-         // Timeout Controls
-        else if (e.code === 'KeyZ' && !e.shiftKey) { adjustTimeouts('home', -1); }
-        else if (e.code === 'KeyZ' && e.shiftKey) { adjustTimeouts('home', 1); }
-        else if (e.code === 'KeyX' && !e.shiftKey) { adjustTimeouts('away', -1); }
-        else if (e.code === 'KeyX' && e.shiftKey) { adjustTimeouts('away', 1); }
         // --- Custom Shot Clock Key ---
         else if (e.code === 'KeyC' && e.shiftKey) { // 'c' - Set Custom Shot Clock
             let custom = prompt('Enter custom shot clock (seconds):', scoreboardState.shotClockSeconds);
@@ -289,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resetGameClock();
         }
         else if (e.code === 'KeyH') { // 'h' - Toggle Help
-             if (helpModal.style.display === 'block') {
+             if (helpModal && helpModal.style.display === 'block') {
                  hideHelp();
              } else {
                  showHelp();
@@ -298,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
      // --- Modal Event Listeners ---
-    closeModalBtn.addEventListener('click', hideHelp);
+    if (closeModalBtn) closeModalBtn.addEventListener('click', hideHelp);
     window.addEventListener('click', (event) => {
         if (event.target === helpModal) {
             hideHelp();
@@ -307,8 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initial Setup ---
     updateDisplay();
-    controlsInfoEl.textContent = "Press Space to Start Game Clock"; // Updated initial instruction
-
 });
 
 // Remove editTeamName function and old keydown for 'n'/'N', replace with unified hotkey logic
