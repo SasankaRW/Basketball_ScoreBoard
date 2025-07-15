@@ -10,7 +10,7 @@ const firebaseConfig = {
   storageBucket: "basketballscoreboard-65c95.firebasestorage.app",
   messagingSenderId: "31697951521",
   appId: "1:31697951521:web:074259ad89964d30437c60"
-};c
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
