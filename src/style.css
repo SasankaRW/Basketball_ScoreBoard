@@ -173,7 +173,7 @@ body {
     content: "BONUS";
     display: inline-block;
     color: var(--clock-red);
-    font-size: clamp(2.5rem, 10vw, 6rem);
+    font-size: clamp(0.8rem, 1.8vw, 1.1rem);
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 2px;
