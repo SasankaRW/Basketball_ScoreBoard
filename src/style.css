@@ -277,14 +277,7 @@ body {
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.7);
 }
 
-.quarter-logo-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(1rem, 3vw, 2rem);
-    width: 100%;
-    margin-top: 0.5rem;
-}
+
 
 .quarter-display {
     font-family: 'Orbitron', monospace;
@@ -299,6 +292,8 @@ body {
     box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.7);
     border: 2px solid var(--clock-white);
     min-width: 2em;
+    margin: 0.5rem auto;
+    display: block;
 }
 
 .controls-info {
@@ -315,6 +310,8 @@ body {
     height: auto;
     opacity: 0.8;
     transition: opacity 0.3s ease;
+    margin: 0.5rem auto;
+    display: block;
 }
 
 .logo:hover {
@@ -545,7 +542,7 @@ body {
     .game-clock { font-size: clamp(4rem, 10vw, 8rem); }
     .shot-clock { font-size: clamp(3.5rem, 9vw, 7rem); }
     .quarter-display { font-size: clamp(2rem, 5vw, 3rem); }
-    .quarter-logo-container { gap: clamp(0.5rem, 2vw, 1.5rem); }
+
 }
 
 
@@ -604,10 +601,7 @@ body {
         font-size: clamp(3rem, 12vw, 5rem); /* Larger font size for mobile */
         padding: 0.2em 0.4em;
     }
-     .quarter-logo-container {
-        gap: clamp(0.5rem, 3vw, 1rem);
-        margin-top: 0.3rem;
-    }
+
     .stats {
         margin-top: 1rem; /* Add space above stats */
     }
@@ -627,7 +621,7 @@ body {
     .game-clock { font-size: clamp(4rem, 16vw, 7rem); }
     .shot-clock { font-size: clamp(3.5rem, 14vw, 6rem); }
     .quarter-display { font-size: clamp(2.5rem, 10vw, 4rem); }
-    .quarter-logo-container { gap: clamp(0.3rem, 2vw, 0.8rem); }
+
     .team-name { font-size: clamp(1.2rem, 4vw, 2rem); }
     .value { font-size: clamp(1.2rem, 4vw, 2rem); }
     .label { font-size: clamp(0.5rem, 1.5vw, 0.7rem); }
