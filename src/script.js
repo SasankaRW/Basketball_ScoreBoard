@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const awayScoreEl = document.getElementById('away-score');
     const gameClockEl = document.getElementById('game-clock');
     const shotClockEl = document.getElementById('shot-clock');
+    const quarterEl = document.getElementById('quarter-display');
     const homeFoulsEl = document.getElementById('home-fouls');
     const awayFoulsEl = document.getElementById('away-fouls');
     const homeTimeoutsEl = document.getElementById('home-timeouts');
@@ -47,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameMinutesInput = document.getElementById('game-minutes-input');
     const gameSecondsInput = document.getElementById('game-seconds-input');
     const shotClockInput = document.getElementById('shot-clock-input');
+    const quarterInput = document.getElementById('quarter-input');
     const applyChangesBtn = document.getElementById('apply-changes');
     const resetAllBtn = document.getElementById('reset-all');
     const startGameClockBtn = document.getElementById('start-game-clock');
@@ -58,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const defaultGameMinutesInput = document.getElementById('default-game-minutes');
     const defaultShotClockInput = document.getElementById('default-shot-clock');
     const defaultTimeoutsInput = document.getElementById('default-timeouts');
+    const defaultQuarterInput = document.getElementById('default-quarter');
     const defaultHomeTeamInput = document.getElementById('default-home-team');
     const defaultAwayTeamInput = document.getElementById('default-away-team');
     const applyDefaultsBtn = document.getElementById('apply-defaults');
@@ -92,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
         awayTimeouts: 2,
         homeTeamName: "HOME",
         awayTeamName: "AWAY",
+        quarter: 1,
         gameMinutes: 10,
         gameSeconds: 0,
         shotClockSeconds: 12,
@@ -101,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         defaultGameMinutes: 10,
         defaultShotClock: 12,
         defaultTimeouts: 2,
+        defaultQuarter: 1,
         defaultHomeTeam: "HOME",
         defaultAwayTeam: "AWAY"
     };
@@ -228,6 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (awayScoreEl) awayScoreEl.textContent = String(scoreboardState.awayScore).padStart(2, '0');
         if (gameClockEl) gameClockEl.textContent = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
         if (shotClockEl) shotClockEl.textContent = String(scoreboardState.shotClockSeconds).padStart(2, '0');
+        if (quarterEl) quarterEl.textContent = scoreboardState.quarter;
         if (homeFoulsEl) homeFoulsEl.textContent = scoreboardState.homeFouls;
         if (awayFoulsEl) awayFoulsEl.textContent = scoreboardState.awayFouls;
         if (homeTimeoutsEl) homeTimeoutsEl.textContent = scoreboardState.homeTimeouts;
@@ -238,11 +244,66 @@ document.addEventListener('DOMContentLoaded', () => {
         const awayTeamNameEl = document.getElementById('away-team-name');
         if (homeTeamNameEl) homeTeamNameEl.textContent = scoreboardState.homeTeamName;
         if (awayTeamNameEl) awayTeamNameEl.textContent = scoreboardState.awayTeamName;
+        
+        // Update foul bonus styling
+        updateFoulBonusStyling();
     };
 
     // --- Firebase Sync ---
     function pushStateToFirebase() {
         set(stateRef, scoreboardState);
+    }
+
+    // --- Foul Bonus Styling ---
+    function updateFoulBonusStyling() {
+        // Get foul stat lines
+        const homeFoulStatLine = document.querySelector('.team.home .stat-line.foul');
+        const awayFoulStatLine = document.querySelector('.team.away .stat-line.foul');
+        
+        // Check if home team just reached bonus
+        const wasHomeBonus = homeFoulStatLine && homeFoulStatLine.classList.contains('bonus');
+        const isHomeBonus = scoreboardState.homeFouls >= 5;
+        
+        // Check if away team just reached bonus
+        const wasAwayBonus = awayFoulStatLine && awayFoulStatLine.classList.contains('bonus');
+        const isAwayBonus = scoreboardState.awayFouls >= 5;
+        
+        // Update home team foul styling
+        if (homeFoulStatLine) {
+            if (isHomeBonus) {
+                homeFoulStatLine.classList.add('bonus');
+                // Play bonus sound if just reached bonus
+                if (!wasHomeBonus) {
+                    playBonusSound();
+                }
+            } else {
+                homeFoulStatLine.classList.remove('bonus');
+            }
+        }
+        
+        // Update away team foul styling
+        if (awayFoulStatLine) {
+            if (isAwayBonus) {
+                awayFoulStatLine.classList.add('bonus');
+                // Play bonus sound if just reached bonus
+                if (!wasAwayBonus) {
+                    playBonusSound();
+                }
+            } else {
+                awayFoulStatLine.classList.remove('bonus');
+            }
+        }
+    }
+
+    // --- Bonus Sound ---
+    function playBonusSound() {
+        const shotClockSound = document.getElementById('shotclock-sound');
+        if (shotClockSound) {
+            shotClockSound.currentTime = 0;
+            shotClockSound.play().catch(() => {
+                // Handle autoplay restrictions silently
+            });
+        }
     }
 
     // --- Listen for Firebase changes ---
@@ -395,6 +456,13 @@ document.addEventListener('DOMContentLoaded', () => {
             pushStateToFirebase();
         });
     }
+
+    function adjustQuarter(delta) {
+        return requireAuth(() => {
+            scoreboardState.quarter = Math.max(1, Math.min(10, scoreboardState.quarter + delta));
+            pushStateToFirebase();
+        });
+    }
     function setCustomTime() {
         return requireAuth(() => {
             stopGameClock();
@@ -459,6 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (awayFoulsInput) awayFoulsInput.value = scoreboardState.awayFouls;
         if (homeTimeoutsInput) homeTimeoutsInput.value = scoreboardState.homeTimeouts;
         if (awayTimeoutsInput) awayTimeoutsInput.value = scoreboardState.awayTimeouts;
+        if (quarterInput) quarterInput.value = scoreboardState.quarter;
         if (gameMinutesInput) gameMinutesInput.value = scoreboardState.gameMinutes;
         if (gameSecondsInput) gameSecondsInput.value = scoreboardState.gameSeconds;
         if (shotClockInput) shotClockInput.value = scoreboardState.shotClockSeconds;
@@ -467,6 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (defaultGameMinutesInput) defaultGameMinutesInput.value = scoreboardState.defaultGameMinutes;
         if (defaultShotClockInput) defaultShotClockInput.value = scoreboardState.defaultShotClock;
         if (defaultTimeoutsInput) defaultTimeoutsInput.value = scoreboardState.defaultTimeouts;
+        if (defaultQuarterInput) defaultQuarterInput.value = scoreboardState.defaultQuarter;
         if (defaultHomeTeamInput) defaultHomeTeamInput.value = scoreboardState.defaultHomeTeam;
         if (defaultAwayTeamInput) defaultAwayTeamInput.value = scoreboardState.defaultAwayTeam;
     }
@@ -495,10 +565,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update shot clock
         if (shotClockInput) scoreboardState.shotClockSeconds = Math.max(0, Math.min(99, parseInt(shotClockInput.value) || 0));
         
+        // Update quarter
+        if (quarterInput) scoreboardState.quarter = Math.max(1, Math.min(10, parseInt(quarterInput.value) || 1));
+        
         // Update default settings
         if (defaultGameMinutesInput) scoreboardState.defaultGameMinutes = Math.max(1, Math.min(99, parseInt(defaultGameMinutesInput.value) || 10));
         if (defaultShotClockInput) scoreboardState.defaultShotClock = Math.max(1, Math.min(99, parseInt(defaultShotClockInput.value) || 12));
         if (defaultTimeoutsInput) scoreboardState.defaultTimeouts = Math.max(0, Math.min(99, parseInt(defaultTimeoutsInput.value) || 2));
+        if (defaultQuarterInput) scoreboardState.defaultQuarter = Math.max(1, Math.min(10, parseInt(defaultQuarterInput.value) || 1));
         if (defaultHomeTeamInput) scoreboardState.defaultHomeTeam = defaultHomeTeamInput.value.trim() || "HOME";
         if (defaultAwayTeamInput) scoreboardState.defaultAwayTeam = defaultAwayTeamInput.value.trim() || "AWAY";
         
@@ -521,6 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scoreboardState.awayTimeouts = scoreboardState.defaultTimeouts;
             scoreboardState.homeTeamName = scoreboardState.defaultHomeTeam;
             scoreboardState.awayTeamName = scoreboardState.defaultAwayTeam;
+            scoreboardState.quarter = scoreboardState.defaultQuarter;
             scoreboardState.gameMinutes = scoreboardState.defaultGameMinutes;
             scoreboardState.gameSeconds = 0;
             scoreboardState.shotClockSeconds = scoreboardState.defaultShotClock;
@@ -543,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 awayTimeouts: scoreboardState.defaultTimeouts,
                 homeTeamName: scoreboardState.defaultHomeTeam,
                 awayTeamName: scoreboardState.defaultAwayTeam,
+                quarter: scoreboardState.defaultQuarter,
                 gameMinutes: scoreboardState.defaultGameMinutes,
                 gameSeconds: 0,
                 shotClockSeconds: scoreboardState.defaultShotClock,
@@ -552,6 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 defaultGameMinutes: scoreboardState.defaultGameMinutes,
                 defaultShotClock: scoreboardState.defaultShotClock,
                 defaultTimeouts: scoreboardState.defaultTimeouts,
+                defaultQuarter: scoreboardState.defaultQuarter,
                 defaultHomeTeam: scoreboardState.defaultHomeTeam,
                 defaultAwayTeam: scoreboardState.defaultAwayTeam
             };
@@ -583,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Keyboard Event Listener ---
     document.addEventListener('keydown', (e) => {
-        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC', 'KeyL', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX'].includes(e.code))) {
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC', 'KeyL', 'KeyQ', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX', 'KeyQ'].includes(e.code))) {
 
         }
 
@@ -626,6 +703,10 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyZ' && e.shiftKey) { adjustTimeouts('home', 1); }
         else if (e.code === 'KeyX' && !e.shiftKey) { adjustTimeouts('away', -1); }
         else if (e.code === 'KeyX' && e.shiftKey) { adjustTimeouts('away', 1); }
+
+        // Quarter Controls
+        else if (e.code === 'KeyQ' && !e.shiftKey) { adjustQuarter(1); }
+        else if (e.code === 'KeyQ' && e.shiftKey) { adjustQuarter(-1); }
 
         // --- Custom Shot Clock Key ---
         else if (e.code === 'KeyC' && e.shiftKey) { // 'c' - Set Custom Shot Clock
