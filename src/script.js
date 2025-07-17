@@ -287,10 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (homeFoulStatLine) {
             if (isHomeBonus) {
                 homeFoulStatLine.classList.add('bonus');
-                // Play bonus sound if just reached bonus
-                if (!wasHomeBonus) {
-                    playBonusSound();
-                }
             } else {
                 homeFoulStatLine.classList.remove('bonus');
             }
@@ -300,26 +296,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (awayFoulStatLine) {
             if (isAwayBonus) {
                 awayFoulStatLine.classList.add('bonus');
-                // Play bonus sound if just reached bonus
-                if (!wasAwayBonus) {
-                    playBonusSound();
-                }
             } else {
                 awayFoulStatLine.classList.remove('bonus');
             }
         }
     }
 
-    // --- Bonus Sound ---
-    function playBonusSound() {
-        const shotClockSound = document.getElementById('shotclock-sound');
-        if (shotClockSound) {
-            shotClockSound.currentTime = 0;
-            shotClockSound.play().catch(() => {
-                // Handle autoplay restrictions silently
-            });
-        }
-    }
+
 
     // --- Listen for Firebase changes ---
     onValue(stateRef, (snapshot) => {
@@ -680,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Keyboard Event Listener ---
     document.addEventListener('keydown', (e) => {
-        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC', 'KeyL', 'KeyQ', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX', 'KeyQ'].includes(e.code))) {
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight','KeyC' ,'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC','KeyQ', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX', 'KeyQ'].includes(e.code))) {
             e.preventDefault();
         }
 
@@ -752,7 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
              }
         }
         else if (e.code === 'KeyC') { // 'c' - Show Control Panel
-            showLoginModal();
+            showControlPanel();
         }
         else if (e.code === 'N' || e.code === 'n') { // 'n' - Set Team Names
             setTeamNames();
@@ -772,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'D' || e.code === 'd') { // 'd' - Apply Defaults
             applyDefaults();
         }
-        else if (e.code === 'L' || e.code === 'l') { // 'l' - Show Login Modal
+        else if (e.code === 'KeyL' || e.code === 'l') { // 'l' - Show Login Modal
             e.preventDefault();
             showLoginModal();
         }
