@@ -28,6 +28,10 @@
         <!-- Center Section -->
         <div class="center-console">
             <div class="clock-container">
+                <div class="clock-label">QUARTER</div>
+                <div class="quarter-display" id="quarter-display">1</div>
+            </div>
+            <div class="clock-container">
                 <div class="clock-label">GAME TIME</div>
                 <div class="game-clock" id="game-clock">12:00</div>
             </div>
@@ -109,6 +113,10 @@
                 <li><strong>Shift + Z:</strong> Home Timeouts +1</li>
                 <li><strong>X:</strong> Away Timeouts -1</li>
                 <li><strong>Shift + X:</strong> Away Timeouts +1</li>
+                <hr>
+                <h2>Quarter</h2>
+                <li><strong>Q:</strong> Quarter +1</li>
+                <li><strong>Shift + Q:</strong> Quarter -1</li>
                 <hr>
                 <li><strong>Shift + C:</strong> Set Custom Shot Clock (prompts for seconds)</li>
                 <li><strong>Enter:</strong> Set Custom Game Time (prompts)</li>
@@ -195,6 +203,14 @@
             </div>
 
             <div class="control-section">
+                <h3>Quarter</h3>
+                <div class="input-group">
+                    <label for="quarter-input">Current Quarter:</label>
+                    <input type="number" id="quarter-input" min="1" max="10" placeholder="1">
+                </div>
+            </div>
+
+            <div class="control-section">
                 <h3>Default Settings</h3>
                 <div class="input-group">
                     <label for="default-game-minutes">Default Game Minutes:</label>
@@ -207,6 +223,10 @@
                 <div class="input-group">
                     <label for="default-timeouts">Default Timeouts:</label>
                     <input type="number" id="default-timeouts" min="0" max="99" placeholder="2">
+                </div>
+                <div class="input-group">
+                    <label for="default-quarter">Default Quarter:</label>
+                    <input type="number" id="default-quarter" min="1" max="10" placeholder="1">
                 </div>
                 <div class="input-group">
                     <label for="default-home-team">Default Home Team:</label>
