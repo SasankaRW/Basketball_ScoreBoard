@@ -73,6 +73,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logout-btn');
     const loginStatus = document.getElementById('login-status');
     const scoreboardEl = document.querySelector('.scoreboard');
+    
+    // Control Panel Authentication Elements
+    const controlUsernameInput = document.getElementById('control-username-input');
+    const controlPasswordInput = document.getElementById('control-password-input');
+    const controlLoginBtn = document.getElementById('control-login-btn');
+    const controlLogoutBtn = document.getElementById('control-logout-btn');
+    const controlLoginStatus = document.getElementById('control-login-status');
 
     // Authentication State
     let isAuthenticated = false;
@@ -133,6 +140,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loginStatus.textContent = message;
             loginStatus.className = `login-status ${type}`;
         }
+        if (controlLoginStatus) {
+            controlLoginStatus.textContent = message;
+            controlLoginStatus.className = `login-status ${type}`;
+        }
     }
 
     function authenticateUser(username, password) {
@@ -180,9 +191,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isAuthenticated) {
                 if (logoutBtn) logoutBtn.style.display = 'inline-block';
                 if (loginBtn) loginBtn.style.display = 'none';
+                if (controlLogoutBtn) controlLogoutBtn.style.display = 'inline-block';
+                if (controlLoginBtn) controlLoginBtn.style.display = 'none';
             } else {
                 if (logoutBtn) logoutBtn.style.display = 'none';
                 if (loginBtn) loginBtn.style.display = 'inline-block';
+                if (controlLogoutBtn) controlLogoutBtn.style.display = 'none';
+                if (controlLoginBtn) controlLoginBtn.style.display = 'inline-block';
             }
         }
     }
@@ -539,6 +554,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (defaultQuarterInput) defaultQuarterInput.value = scoreboardState.defaultQuarter;
         if (defaultHomeTeamInput) defaultHomeTeamInput.value = scoreboardState.defaultHomeTeam;
         if (defaultAwayTeamInput) defaultAwayTeamInput.value = scoreboardState.defaultAwayTeam;
+        
+        // Clear authentication fields
+        if (controlUsernameInput) controlUsernameInput.value = '';
+        if (controlPasswordInput) controlPasswordInput.value = '';
+        if (controlLoginStatus) controlLoginStatus.textContent = '';
     }
 
     function applyControlPanelChanges() {
@@ -732,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
              }
         }
         else if (e.code === 'KeyC') { // 'c' - Show Control Panel
-            showControlPanel();
+            showLoginModal();
         }
         else if (e.code === 'N' || e.code === 'n') { // 'n' - Set Team Names
             setTeamNames();
@@ -753,6 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
             applyDefaults();
         }
         else if (e.code === 'L' || e.code === 'l') { // 'l' - Show Login Modal
+            e.preventDefault();
             showLoginModal();
         }
     });
@@ -793,6 +814,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
+    // --- Control Panel Authentication Event Listeners ---
+    if (controlLoginBtn) controlLoginBtn.addEventListener('click', () => {
+        const username = controlUsernameInput ? controlUsernameInput.value.trim() : '';
+        const password = controlPasswordInput ? controlPasswordInput.value : '';
+        
+        if (!username || !password) {
+            showLoginStatus('Please enter both username and password', 'error');
+            return;
+        }
+        
+        authenticateUser(username, password);
+    });
+
+    if (controlLogoutBtn) controlLogoutBtn.addEventListener('click', logout);
+
     // Handle Enter key in login form
     if (usernameInput) {
         usernameInput.addEventListener('keypress', (e) => {
@@ -806,6 +842,23 @@ document.addEventListener('DOMContentLoaded', () => {
         passwordInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 loginBtn.click();
+            }
+        });
+    }
+
+    // Handle Enter key in control panel login form
+    if (controlUsernameInput) {
+        controlUsernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && controlPasswordInput) {
+                controlPasswordInput.focus();
+            }
+        });
+    }
+
+    if (controlPasswordInput) {
+        controlPasswordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                controlLoginBtn.click();
             }
         });
     }
