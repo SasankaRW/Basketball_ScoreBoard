@@ -112,9 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Authentication Functions ---
     function showLoginModal() {
+        console.log('showLoginModal called');
+        console.log('loginModal element:', loginModal);
         if (loginModal) {
             loginModal.style.display = 'block';
+            console.log('Login modal display set to block');
             if (usernameInput) usernameInput.focus();
+        } else {
+            console.log('Login modal element not found!');
         }
     }
 
@@ -753,6 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
             applyDefaults();
         }
         else if (e.code === 'L' || e.code === 'l') { // 'l' - Show Login Modal
+            console.log('L key pressed, calling showLoginModal');
             showLoginModal();
         }
     });
