@@ -26,6 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameClockEl = document.getElementById('game-clock');
     const shotClockEl = document.getElementById('shot-clock');
     const quarterEl = document.getElementById('quarter-display');
+    const possessionArrowLeft = document.getElementById('possession-arrow-left');
+    const possessionArrowRight = document.getElementById('possession-arrow-right');
     const homeFoulsEl = document.getElementById('home-fouls');
     const awayFoulsEl = document.getElementById('away-fouls');
     const homeTimeoutsEl = document.getElementById('home-timeouts');
@@ -276,16 +278,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Ball Possession Indicator ---
     function updateBallPossessionIndicator() {
-        const possessionArrow = document.getElementById('possession-arrow');
-        if (possessionArrow) {
+        const possessionArrowLeft = document.getElementById('possession-arrow-left');
+        const possessionArrowRight = document.getElementById('possession-arrow-right');
+        
+        if (possessionArrowLeft && possessionArrowRight) {
+            // Reset both arrows
+            possessionArrowLeft.classList.remove('active');
+            possessionArrowRight.classList.remove('active');
+            possessionArrowLeft.textContent = '';
+            possessionArrowRight.textContent = '';
+            
+            // Show arrow based on possession
             if (scoreboardState.ballPossession === 'home') {
-                possessionArrow.textContent = '◀';
-                possessionArrow.style.color = 'var(--score-blue)';
-                possessionArrow.style.textShadow = '0 0 10px rgba(52, 152, 219, 0.7)';
+                possessionArrowLeft.classList.add('active');
+                possessionArrowLeft.textContent = '◀';
             } else {
-                possessionArrow.textContent = '▶';
-                possessionArrow.style.color = 'var(--stat-yellow)';
-                possessionArrow.style.textShadow = '0 0 10px rgba(241, 196, 15, 0.7)';
+                possessionArrowRight.classList.add('active');
+                possessionArrowRight.textContent = '▶';
             }
         }
     }

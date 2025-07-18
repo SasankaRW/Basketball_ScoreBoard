@@ -244,6 +244,15 @@ body {
     margin-bottom: 0.25rem;
 }
 
+.game-clock-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0.25rem 0;
+    width: 100%;
+}
+
 .game-clock {
     font-family: 'Orbitron', sans-serif;
     font-size: clamp(5rem, 14vw, 13rem);
@@ -252,11 +261,34 @@ body {
     padding: 0.3rem 0.8rem;
     border-radius: 10px;
     text-align: center;
-    width: 100%;
-    margin: 0.25rem 0;
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
     min-width: fit-content;
     overflow: visible;
+}
+
+.possession-arrow-left,
+.possession-arrow-right {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    color: transparent;
+    text-shadow: none;
+    transition: all 0.3s ease;
+    min-width: 1.5em;
+    text-align: center;
+    animation: none;
+}
+
+.possession-arrow-left.active {
+    color: var(--score-blue);
+    text-shadow: 0 0 10px rgba(52, 152, 219, 0.7);
+    animation: arrowPulse 2s infinite;
+}
+
+.possession-arrow-right.active {
+    color: var(--stat-yellow);
+    text-shadow: 0 0 10px rgba(241, 196, 15, 0.7);
+    animation: arrowPulse 2s infinite;
 }
 
 .shot-clock {
@@ -274,40 +306,7 @@ body {
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.7);
 }
 
-/* Ball Possession Indicator */
-.ball-possession-indicator {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin: 0.5rem auto;
-    padding: 0.5rem;
-    background-color: var(--panel-bg);
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    min-width: 4em;
-    width: 90%;
-}
 
-.possession-arrow {
-    font-family: 'Orbitron', monospace;
-    font-size: clamp(2rem, 5vw, 3rem);
-    font-weight: 700;
-    color: var(--stat-yellow);
-    text-shadow: 0 0 10px rgba(241, 196, 15, 0.7);
-    margin-bottom: 0.2rem;
-    transition: all 0.3s ease;
-    animation: arrowPulse 2s infinite;
-}
-
-.possession-label {
-    font-family: 'Roboto', sans-serif;
-    font-size: clamp(0.6rem, 1.5vw, 0.8rem);
-    font-weight: 700;
-    color: var(--text-medium);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-align: center;
-}
 
 @keyframes arrowPulse {
     0%, 100% { 
