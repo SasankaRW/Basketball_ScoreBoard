@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameSecondsInput = document.getElementById('game-seconds-input');
     const shotClockInput = document.getElementById('shot-clock-input');
     const quarterInput = document.getElementById('quarter-input');
+    const ballPossessionInput = document.getElementById('ball-possession-input');
     const applyChangesBtn = document.getElementById('apply-changes');
     const resetAllBtn = document.getElementById('reset-all');
     const startGameClockBtn = document.getElementById('start-game-clock');
@@ -108,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shotClockSeconds: 24,
         isGameClockRunning: false,
         isShotClockRunning: false,
+        ballPossession: 'home', // 'home' or 'away'
         // Default Settings
         defaultGameMinutes: 10,
         defaultShotClock: 24,
@@ -260,6 +262,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (homeTeamNameEl) homeTeamNameEl.textContent = scoreboardState.homeTeamName;
         if (awayTeamNameEl) awayTeamNameEl.textContent = scoreboardState.awayTeamName;
         
+        // Update ball possession indicator
+        updateBallPossessionIndicator();
+        
         // Update foul bonus styling
         updateFoulBonusStyling();
     };
@@ -267,6 +272,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Firebase Sync ---
     function pushStateToFirebase() {
         set(stateRef, scoreboardState);
+    }
+
+    // --- Ball Possession Indicator ---
+    function updateBallPossessionIndicator() {
+        const possessionArrow = document.getElementById('possession-arrow');
+        if (possessionArrow) {
+            if (scoreboardState.ballPossession === 'home') {
+                possessionArrow.textContent = '◀';
+                possessionArrow.style.color = 'var(--score-blue)';
+                possessionArrow.style.textShadow = '0 0 10px rgba(52, 152, 219, 0.7)';
+            } else {
+                possessionArrow.textContent = '▶';
+                possessionArrow.style.color = 'var(--stat-yellow)';
+                possessionArrow.style.textShadow = '0 0 10px rgba(241, 196, 15, 0.7)';
+            }
+        }
     }
 
     // --- Foul Bonus Styling ---
@@ -461,6 +482,13 @@ document.addEventListener('DOMContentLoaded', () => {
             pushStateToFirebase();
         });
     }
+
+    function toggleBallPossession() {
+        return requireAuth(() => {
+            scoreboardState.ballPossession = scoreboardState.ballPossession === 'home' ? 'away' : 'home';
+            pushStateToFirebase();
+        });
+    }
     function setCustomTime() {
         return requireAuth(() => {
             stopGameClock();
@@ -526,6 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (homeTimeoutsInput) homeTimeoutsInput.value = scoreboardState.homeTimeouts;
         if (awayTimeoutsInput) awayTimeoutsInput.value = scoreboardState.awayTimeouts;
         if (quarterInput) quarterInput.value = scoreboardState.quarter;
+        if (ballPossessionInput) ballPossessionInput.value = scoreboardState.ballPossession;
         if (gameMinutesInput) gameMinutesInput.value = scoreboardState.gameMinutes;
         if (gameSecondsInput) gameSecondsInput.value = scoreboardState.gameSeconds;
         if (shotClockInput) shotClockInput.value = scoreboardState.shotClockSeconds;
@@ -571,6 +600,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update quarter
         if (quarterInput) scoreboardState.quarter = Math.max(1, Math.min(10, parseInt(quarterInput.value) || 1));
         
+        // Update ball possession
+        if (ballPossessionInput) scoreboardState.ballPossession = ballPossessionInput.value;
+        
         // Update default settings
         if (defaultGameMinutesInput) scoreboardState.defaultGameMinutes = Math.max(1, Math.min(99, parseInt(defaultGameMinutesInput.value) || 10));
         if (defaultShotClockInput) scoreboardState.defaultShotClock = Math.max(1, Math.min(99, parseInt(defaultShotClockInput.value) || 12));
@@ -599,6 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scoreboardState.homeTeamName = scoreboardState.defaultHomeTeam;
             scoreboardState.awayTeamName = scoreboardState.defaultAwayTeam;
             scoreboardState.quarter = scoreboardState.defaultQuarter;
+            scoreboardState.ballPossession = 'home';
             scoreboardState.gameMinutes = scoreboardState.defaultGameMinutes;
             scoreboardState.gameSeconds = 0;
             scoreboardState.shotClockSeconds = scoreboardState.defaultShotClock;
@@ -622,6 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 homeTeamName: scoreboardState.defaultHomeTeam,
                 awayTeamName: scoreboardState.defaultAwayTeam,
                 quarter: scoreboardState.defaultQuarter,
+                ballPossession: 'home',
                 gameMinutes: scoreboardState.defaultGameMinutes,
                 gameSeconds: 0,
                 shotClockSeconds: scoreboardState.defaultShotClock,
@@ -660,7 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resetShotClock(24);
         } else if (e.button === 1) { // Middle click (scroll wheel)
             e.preventDefault();
-            resetShotClock(24);
+            resetShotClock(14);
         }
     });
 
@@ -713,6 +747,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Quarter Controls
         else if (e.code === 'KeyQ' && !e.shiftKey) { adjustQuarter(1); }
         else if (e.code === 'KeyQ' && e.shiftKey) { adjustQuarter(-1); }
+
+        // Ball Possession Control
+        else if (e.code === 'KeyB') { toggleBallPossession(); }
 
         // --- Custom Shot Clock Key ---
         else if (e.code === 'KeyC' && e.shiftKey) { // 'c' - Set Custom Shot Clock

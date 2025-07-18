@@ -35,6 +35,10 @@
                 <div class="clock-label">SHOT CLOCK</div>
                 <div class="shot-clock" id="shot-clock">24</div>
             </div>
+            <div class="ball-possession-indicator">
+                <div class="possession-arrow" id="possession-arrow">▶</div>
+                <div class="possession-label">BALL</div>
+            </div>
             <div class="quarter-display" id="quarter-display">Q1</div>
             <img src="logo.png" alt="Basketball Logo" class="logo">
             <div class="controls-info" id="controls-info">
@@ -114,6 +118,9 @@
                 <h2>Quarter</h2>
                 <li><strong>Q:</strong> Quarter +1</li>
                 <li><strong>Shift + Q:</strong> Quarter -1</li>
+                <hr>
+                <h2>Ball Possession</h2>
+                <li><strong>B:</strong> Toggle Ball Possession</li>
                 <hr>
                 <li><strong>Shift + C:</strong> Set Custom Shot Clock (prompts for seconds)</li>
                 <li><strong>Enter:</strong> Set Custom Game Time (prompts)</li>
@@ -204,6 +211,17 @@
                 <div class="input-group">
                     <label for="quarter-input">Current Quarter:</label>
                     <input type="number" id="quarter-input" min="1" max="10" placeholder="1">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Ball Possession</h3>
+                <div class="input-group">
+                    <label for="ball-possession-input">Ball Possession:</label>
+                    <select id="ball-possession-input">
+                        <option value="home">Home Team</option>
+                        <option value="away">Away Team</option>
+                    </select>
                 </div>
             </div>
 
