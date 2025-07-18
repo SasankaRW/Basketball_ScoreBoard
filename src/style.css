@@ -81,6 +81,7 @@ body {
     color: var(--text-light);
     text-align: center;
     line-height: 1.2;
+    position: relative;
 }
 
 .score {
@@ -244,15 +245,6 @@ body {
     margin-bottom: 0.25rem;
 }
 
-.game-clock-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin: 0.25rem 0;
-    width: 100%;
-}
-
 .game-clock {
     font-family: 'Orbitron', sans-serif;
     font-size: clamp(5rem, 14vw, 13rem);
@@ -261,34 +253,11 @@ body {
     padding: 0.3rem 0.8rem;
     border-radius: 10px;
     text-align: center;
+    width: 100%;
+    margin: 0.25rem 0;
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
     min-width: fit-content;
     overflow: visible;
-}
-
-.possession-arrow-left,
-.possession-arrow-right {
-    font-family: 'Orbitron', monospace;
-    font-size: clamp(2rem, 5vw, 3rem);
-    font-weight: 700;
-    color: transparent;
-    text-shadow: none;
-    transition: all 0.3s ease;
-    min-width: 1.5em;
-    text-align: center;
-    animation: none;
-}
-
-.possession-arrow-left.active {
-    color: var(--score-blue);
-    text-shadow: 0 0 10px rgba(52, 152, 219, 0.7);
-    animation: arrowPulse 2s infinite;
-}
-
-.possession-arrow-right.active {
-    color: var(--stat-yellow);
-    text-shadow: 0 0 10px rgba(241, 196, 15, 0.7);
-    animation: arrowPulse 2s infinite;
 }
 
 .shot-clock {
@@ -306,16 +275,43 @@ body {
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.7);
 }
 
+/* Ball Possession Arrow */
+.possession-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    font-weight: 700;
+    transition: all 0.3s ease;
+    animation: arrowPulse 2s infinite;
+    opacity: 0;
+}
 
+.team.home .possession-arrow {
+    right: -2rem;
+    color: var(--score-blue);
+    text-shadow: 0 0 10px rgba(52, 152, 219, 0.7);
+}
+
+.team.away .possession-arrow {
+    left: -2rem;
+    color: var(--stat-yellow);
+    text-shadow: 0 0 10px rgba(241, 196, 15, 0.7);
+}
+
+.possession-arrow.active {
+    opacity: 1;
+}
 
 @keyframes arrowPulse {
     0%, 100% { 
         opacity: 1; 
-        transform: scale(1);
+        transform: translateY(-50%) scale(1);
     }
     50% { 
         opacity: 0.8; 
-        transform: scale(1.1);
+        transform: translateY(-50%) scale(1.1);
     }
 }
 
@@ -665,6 +661,18 @@ body {
     }
      .value {
         font-size: clamp(1.8rem, 6vw, 3rem);
+    }
+
+    .possession-arrow {
+        font-size: clamp(1rem, 2.5vw, 2rem);
+    }
+
+    .team.home .possession-arrow {
+        right: -1.5rem;
+    }
+
+    .team.away .possession-arrow {
+        left: -1.5rem;
     }
 
     .modal-content {

@@ -26,8 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameClockEl = document.getElementById('game-clock');
     const shotClockEl = document.getElementById('shot-clock');
     const quarterEl = document.getElementById('quarter-display');
-    const possessionArrowLeft = document.getElementById('possession-arrow-left');
-    const possessionArrowRight = document.getElementById('possession-arrow-right');
     const homeFoulsEl = document.getElementById('home-fouls');
     const awayFoulsEl = document.getElementById('away-fouls');
     const homeTimeoutsEl = document.getElementById('home-timeouts');
@@ -278,23 +276,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Ball Possession Indicator ---
     function updateBallPossessionIndicator() {
-        const possessionArrowLeft = document.getElementById('possession-arrow-left');
-        const possessionArrowRight = document.getElementById('possession-arrow-right');
+        const homeArrow = document.getElementById('home-possession-arrow');
+        const awayArrow = document.getElementById('away-possession-arrow');
         
-        if (possessionArrowLeft && possessionArrowRight) {
-            // Reset both arrows
-            possessionArrowLeft.classList.remove('active');
-            possessionArrowRight.classList.remove('active');
-            possessionArrowLeft.textContent = '';
-            possessionArrowRight.textContent = '';
-            
-            // Show arrow based on possession
+        if (homeArrow && awayArrow) {
             if (scoreboardState.ballPossession === 'home') {
-                possessionArrowLeft.classList.add('active');
-                possessionArrowLeft.textContent = '◀';
+                homeArrow.textContent = '◀';
+                homeArrow.classList.add('active');
+                awayArrow.classList.remove('active');
             } else {
-                possessionArrowRight.classList.add('active');
-                possessionArrowRight.textContent = '▶';
+                awayArrow.textContent = '▶';
+                awayArrow.classList.add('active');
+                homeArrow.classList.remove('active');
             }
         }
     }
