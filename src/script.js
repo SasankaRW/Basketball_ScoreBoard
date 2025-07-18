@@ -299,30 +299,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Firebase Sync ---
     function pushStateToFirebase() {
-        console.log('Pushing to Firebase:', {
-            homeTeamName: scoreboardState.homeTeamName,
-            awayTeamName: scoreboardState.awayTeamName,
-            shotClockSeconds: scoreboardState.shotClockSeconds
-        });
         set(stateRef, scoreboardState);
     }
 
-    // --- Targeted Firebase Updates ---
-    function updateFirebaseField(field, value) {
-        const update = {};
-        update[field] = value;
-        set(stateRef, { ...scoreboardState, ...update });
+    // --- Efficient Firebase Updates ---
+    function pushStateToFirebaseEfficient(updates) {
+        const updateData = {};
+        Object.keys(updates).forEach(key => {
+            if (scoreboardState[key] !== updates[key]) {
+                updateData[key] = updates[key];
+            }
+        });
+        
+        if (Object.keys(updateData).length > 0) {
+            set(stateRef, { ...scoreboardState, ...updateData });
+        }
     }
 
-    // --- Sync Team Names to Firebase ---
-    function syncTeamNamesToFirebase() {
-        console.log('Syncing team names to Firebase:', {
-            homeTeamName: scoreboardState.homeTeamName,
-            awayTeamName: scoreboardState.awayTeamName
-        });
-        updateFirebaseField('homeTeamName', scoreboardState.homeTeamName);
-        updateFirebaseField('awayTeamName', scoreboardState.awayTeamName);
-    }
+
 
     // --- Ball Possession Indicator ---
     function updateBallPossessionIndicator() {
@@ -426,7 +420,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             alert("Game Over!");
         }
-        pushStateToFirebase();
+        // Only update game clock in Firebase, not the entire state
+        pushStateToFirebaseEfficient({ 
+            gameMinutes: scoreboardState.gameMinutes, 
+            gameSeconds: scoreboardState.gameSeconds 
+        });
     }
     function tickShotClock() {
         if (scoreboardState.shotClockSeconds > 0) {
@@ -445,7 +443,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             stopShotClock();
         }
-        pushStateToFirebase();
+        // Only update shot clock in Firebase, not the entire state
+        pushStateToFirebaseEfficient({ shotClockSeconds: scoreboardState.shotClockSeconds });
     }
     let gameTimerInterval = null;
     let shotClockTimerInterval = null;
@@ -515,7 +514,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (scoreboardState.isGameClockRunning) {
                 startShotClock();
             }
-            pushStateToFirebase();
+            // Only update shot clock in Firebase
+            pushStateToFirebaseEfficient({ shotClockSeconds: time });
         });
     }
     // --- Control Functions ---
@@ -526,7 +526,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (team === 'away') {
                 scoreboardState.awayScore = Math.max(0, Math.min(999, scoreboardState.awayScore + delta));
             }
-            pushStateToFirebase();
+            pushStateToFirebaseEfficient({ 
+                homeScore: scoreboardState.homeScore, 
+                awayScore: scoreboardState.awayScore 
+            });
         });
     }
     function adjustFouls(team, delta) {
@@ -536,7 +539,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (team === 'away') {
                 scoreboardState.awayFouls = Math.max(0, Math.min(99, scoreboardState.awayFouls + delta));
             }
-            pushStateToFirebase();
+            pushStateToFirebaseEfficient({ 
+                homeFouls: scoreboardState.homeFouls, 
+                awayFouls: scoreboardState.awayFouls 
+            });
         });
     }
     function adjustTimeouts(team, delta) {
@@ -546,21 +552,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (team === 'away') {
                 scoreboardState.awayTimeouts = Math.max(0, Math.min(99, scoreboardState.awayTimeouts + delta));
             }
-            pushStateToFirebase();
+            pushStateToFirebaseEfficient({ 
+                homeTimeouts: scoreboardState.homeTimeouts, 
+                awayTimeouts: scoreboardState.awayTimeouts 
+            });
         });
     }
 
     function adjustQuarter(delta) {
         return requireAuth(() => {
             scoreboardState.quarter = Math.max(1, Math.min(10, scoreboardState.quarter + delta));
-            pushStateToFirebase();
+            pushStateToFirebaseEfficient({ quarter: scoreboardState.quarter });
         });
     }
 
     function toggleBallPossession() {
         return requireAuth(() => {
             scoreboardState.ballPossession = scoreboardState.ballPossession === 'home' ? 'away' : 'home';
-            pushStateToFirebase();
+            pushStateToFirebaseEfficient({ ballPossession: scoreboardState.ballPossession });
         });
     }
     function setCustomTime() {
@@ -600,7 +609,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 scoreboardState.awayTeamName = awayName.trim() || "AWAY";
             }
             
-            pushStateToFirebase();
+            // Only update team names in Firebase when they're actually changed
+            pushStateToFirebaseEfficient({ 
+                homeTeamName: scoreboardState.homeTeamName, 
+                awayTeamName: scoreboardState.awayTeamName 
+            });
         });
     }
 
