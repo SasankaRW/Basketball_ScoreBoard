@@ -259,8 +259,36 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update team names
         const homeTeamNameEl = document.getElementById('home-team-name');
         const awayTeamNameEl = document.getElementById('away-team-name');
-        if (homeTeamNameEl) homeTeamNameEl.textContent = scoreboardState.homeTeamName;
-        if (awayTeamNameEl) awayTeamNameEl.textContent = scoreboardState.awayTeamName;
+        if (homeTeamNameEl) {
+            // Update only the text content, preserving the possession arrow div
+            const textNode = homeTeamNameEl.firstChild;
+            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                textNode.textContent = scoreboardState.homeTeamName;
+            } else {
+                // If no text node exists, create one
+                homeTeamNameEl.textContent = scoreboardState.homeTeamName;
+                // Re-add the possession arrow div
+                const arrowDiv = document.createElement('div');
+                arrowDiv.className = 'possession-arrow';
+                arrowDiv.id = 'home-possession-arrow';
+                homeTeamNameEl.appendChild(arrowDiv);
+            }
+        }
+        if (awayTeamNameEl) {
+            // Update only the text content, preserving the possession arrow div
+            const textNode = awayTeamNameEl.firstChild;
+            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                textNode.textContent = scoreboardState.awayTeamName;
+            } else {
+                // If no text node exists, create one
+                awayTeamNameEl.textContent = scoreboardState.awayTeamName;
+                // Re-add the possession arrow div
+                const arrowDiv = document.createElement('div');
+                arrowDiv.className = 'possession-arrow';
+                arrowDiv.id = 'away-possession-arrow';
+                awayTeamNameEl.appendChild(arrowDiv);
+            }
+        }
         
         // Update ball possession indicator
         updateBallPossessionIndicator();
@@ -607,7 +635,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update default settings
         if (defaultGameMinutesInput) scoreboardState.defaultGameMinutes = Math.max(1, Math.min(99, parseInt(defaultGameMinutesInput.value) || 10));
-        if (defaultShotClockInput) scoreboardState.defaultShotClock = Math.max(1, Math.min(99, parseInt(defaultShotClockInput.value) || 12));
+        if (defaultShotClockInput) scoreboardState.defaultShotClock = Math.max(1, Math.min(99, parseInt(defaultShotClockInput.value) || 24));
         if (defaultTimeoutsInput) scoreboardState.defaultTimeouts = Math.max(0, Math.min(99, parseInt(defaultTimeoutsInput.value) || 2));
         if (defaultQuarterInput) scoreboardState.defaultQuarter = Math.max(1, Math.min(10, parseInt(defaultQuarterInput.value) || 1));
         if (defaultHomeTeamInput) scoreboardState.defaultHomeTeam = defaultHomeTeamInput.value.trim() || "HOME";
@@ -702,7 +730,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Keyboard Event Listener ---
     document.addEventListener('keydown', (e) => {
-        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight','KeyC' ,'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC','KeyQ', 'Enter'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX', 'KeyQ'].includes(e.code))) {
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight','KeyC' ,'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC','KeyQ', 'KeyB', 'Enter', 'KeyN', 'KeyP', 'KeyO', 'KeyA', 'KeyD', 'KeyL'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX', 'KeyQ'].includes(e.code))) {
             e.preventDefault();
         }
 
@@ -936,16 +964,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { once: true });
 });
 
-// Remove editTeamName function and old keydown for 'n'/'N', replace with unified hotkey logic
-const homeTeamNameEl = document.getElementById('home-team-name');
-const awayTeamNameEl = document.getElementById('away-team-name');
-
-// --- Unified Team Name Hotkey ---
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'n' || e.key === 'N') {
-        let homeName = prompt('Enter Home Team Name:', homeTeamNameEl.textContent);
-        let awayName = prompt('Enter Away Team Name:', awayTeamNameEl.textContent);
-        if (homeName && homeName.trim().length > 0) homeTeamNameEl.textContent = homeName.trim();
-        if (awayName && awayName.trim().length > 0) awayTeamNameEl.textContent = awayName.trim();
-    }
-});
