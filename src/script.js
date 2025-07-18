@@ -105,12 +105,12 @@ document.addEventListener('DOMContentLoaded', () => {
         quarter: 1,
         gameMinutes: 10,
         gameSeconds: 0,
-        shotClockSeconds: 12,
+        shotClockSeconds: 24,
         isGameClockRunning: false,
         isShotClockRunning: false,
         // Default Settings
         defaultGameMinutes: 10,
-        defaultShotClock: 12,
+        defaultShotClock: 24,
         defaultTimeouts: 2,
         defaultQuarter: 1,
         defaultHomeTeam: "HOME",
@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    function resetShotClock(time = 12) {
+    function resetShotClock(time = 24) {
         return requireAuth(() => {
             scoreboardState.shotClockSeconds = time;
             if (shotClockEl) {
@@ -657,7 +657,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 startShotClock();
             }
         } else if (e.button === 0) { // Left click
-            resetShotClock();
+            resetShotClock(24);
+        } else if (e.button === 1) { // Middle click (scroll wheel)
+            e.preventDefault();
+            resetShotClock(24);
         }
     });
 
@@ -682,11 +685,11 @@ document.addEventListener('DOMContentLoaded', () => {
                  startShotClock();
              }
         }
-        else if (e.code === 'KeyR' && !e.shiftKey) { // 'r' - Reset Shot Clock (Full)
-            resetShotClock(12);
+        else if (e.code === 'KeyR' && !e.shiftKey) { // 'r' - Reset Shot Clock (24s)
+            resetShotClock(24);
         }
-         else if (e.code === 'KeyR' && e.shiftKey) { // Shift + 'r' - Reset Shot Clock (O.Reb)
-            resetShotClock(12);
+         else if (e.code === 'KeyR' && e.shiftKey) { // Shift + 'r' - Reset Shot Clock (14s)
+            resetShotClock(14);
         }
 
         // Score Controls
