@@ -323,28 +323,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const homeArrow = document.getElementById('home-possession-arrow');
         const awayArrow = document.getElementById('away-possession-arrow');
         
-        console.log('Updating ball possession:', scoreboardState.ballPossession);
-        console.log('Home arrow found:', !!homeArrow);
-        console.log('Away arrow found:', !!awayArrow);
+   
         
         if (homeArrow && awayArrow) {
             // Clear both arrows first
             homeArrow.classList.remove('active');
             awayArrow.classList.remove('active');
             
-            console.log('Cleared both arrows');
+            
             
             if (scoreboardState.ballPossession === 'home') {
                 homeArrow.textContent = '◀';
                 homeArrow.classList.add('active');
-                console.log('Set home arrow active');
+                
             } else {
                 awayArrow.textContent = '▶';
                 awayArrow.classList.add('active');
-                console.log('Set away arrow active');
+               
             }
         } else {
-            console.log('Arrows not found!');
+           
         }
     }
 
