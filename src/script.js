@@ -299,7 +299,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Firebase Sync ---
     function pushStateToFirebase() {
+        console.log('Pushing to Firebase:', {
+            homeTeamName: scoreboardState.homeTeamName,
+            awayTeamName: scoreboardState.awayTeamName,
+            shotClockSeconds: scoreboardState.shotClockSeconds
+        });
         set(stateRef, scoreboardState);
+    }
+
+    // --- Targeted Firebase Updates ---
+    function updateFirebaseField(field, value) {
+        const update = {};
+        update[field] = value;
+        set(stateRef, { ...scoreboardState, ...update });
+    }
+
+    // --- Sync Team Names to Firebase ---
+    function syncTeamNamesToFirebase() {
+        console.log('Syncing team names to Firebase:', {
+            homeTeamName: scoreboardState.homeTeamName,
+            awayTeamName: scoreboardState.awayTeamName
+        });
+        updateFirebaseField('homeTeamName', scoreboardState.homeTeamName);
+        updateFirebaseField('awayTeamName', scoreboardState.awayTeamName);
     }
 
     // --- Ball Possession Indicator ---
@@ -359,8 +381,30 @@ document.addEventListener('DOMContentLoaded', () => {
     onValue(stateRef, (snapshot) => {
         const newState = snapshot.val();
         if (newState) {
-            scoreboardState = { ...scoreboardState, ...newState };
-            updateDisplay();
+            // Only update if the new state is different from current state
+            const hasChanges = Object.keys(newState).some(key => 
+                scoreboardState[key] !== newState[key]
+            );
+            
+            if (hasChanges) {
+                // Preserve team names if they're not in the new state
+                const currentTeamNames = {
+                    homeTeamName: scoreboardState.homeTeamName,
+                    awayTeamName: scoreboardState.awayTeamName
+                };
+                
+                scoreboardState = { ...scoreboardState, ...newState };
+                
+                // Ensure team names are preserved
+                if (!newState.hasOwnProperty('homeTeamName')) {
+                    scoreboardState.homeTeamName = currentTeamNames.homeTeamName;
+                }
+                if (!newState.hasOwnProperty('awayTeamName')) {
+                    scoreboardState.awayTeamName = currentTeamNames.awayTeamName;
+                }
+                
+                updateDisplay();
+            }
         }
     });
 
@@ -465,12 +509,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return requireAuth(() => {
             scoreboardState.shotClockSeconds = time;
             if (shotClockEl) {
-        shotClockEl.style.backgroundColor = '';
+                shotClockEl.style.backgroundColor = '';
                 shotClockEl.style.color = '';
             }
             if (scoreboardState.isGameClockRunning) {
-           startShotClock();
-        }
+                startShotClock();
+            }
             pushStateToFirebase();
         });
     }
