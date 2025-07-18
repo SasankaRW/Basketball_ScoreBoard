@@ -37,8 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Control Panel Elements
     const controlPanelModal = document.getElementById('control-panel-modal');
     const controlCloseBtn = document.getElementById('control-close-button');
-    const homeTeamInput = document.getElementById('home-team-input');
-    const awayTeamInput = document.getElementById('away-team-input');
     const homeScoreInput = document.getElementById('home-score-input');
     const awayScoreInput = document.getElementById('away-score-input');
     const homeFoulsInput = document.getElementById('home-fouls-input');
@@ -320,14 +318,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const awayArrow = document.getElementById('away-possession-arrow');
         
         if (homeArrow && awayArrow) {
+            // Clear both arrows first
+            homeArrow.classList.remove('active');
+            awayArrow.classList.remove('active');
+            
             if (scoreboardState.ballPossession === 'home') {
                 homeArrow.textContent = '◀';
                 homeArrow.classList.add('active');
-                awayArrow.classList.remove('active');
             } else {
                 awayArrow.textContent = '▶';
                 awayArrow.classList.add('active');
-                homeArrow.classList.remove('active');
             }
         }
     }
@@ -588,22 +588,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Team Name Functions ---
     function setTeamNames() {
-        return requireAuth(() => {
-            const homeName = prompt("Enter Home Team Name:", scoreboardState.homeTeamName);
-            if (homeName !== null) {
-                scoreboardState.homeTeamName = homeName.trim() || "HOME";
-            }
-            
-            const awayName = prompt("Enter Away Team Name:", scoreboardState.awayTeamName);
-            if (awayName !== null) {
-                scoreboardState.awayTeamName = awayName.trim() || "AWAY";
-            }
-            
-            // Only update team names in Firebase when they're actually changed
-            pushStateToFirebaseEfficient({ 
-                homeTeamName: scoreboardState.homeTeamName, 
-                awayTeamName: scoreboardState.awayTeamName 
-            });
+        const homeName = prompt("Enter Home Team Name:", scoreboardState.homeTeamName);
+        if (homeName !== null) {
+            scoreboardState.homeTeamName = homeName.trim() || "HOME";
+        }
+        
+        const awayName = prompt("Enter Away Team Name:", scoreboardState.awayTeamName);
+        if (awayName !== null) {
+            scoreboardState.awayTeamName = awayName.trim() || "AWAY";
+        }
+        
+        // Only update team names in Firebase when they're actually changed
+        pushStateToFirebaseEfficient({ 
+            homeTeamName: scoreboardState.homeTeamName, 
+            awayTeamName: scoreboardState.awayTeamName 
         });
     }
 
@@ -622,8 +620,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function populateControlPanel() {
-        if (homeTeamInput) homeTeamInput.value = scoreboardState.homeTeamName;
-        if (awayTeamInput) awayTeamInput.value = scoreboardState.awayTeamName;
         if (homeScoreInput) homeScoreInput.value = scoreboardState.homeScore;
         if (awayScoreInput) awayScoreInput.value = scoreboardState.awayScore;
         if (homeFoulsInput) homeFoulsInput.value = scoreboardState.homeFouls;
@@ -651,10 +647,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyControlPanelChanges() {
-        // Update team names
-        if (homeTeamInput) scoreboardState.homeTeamName = homeTeamInput.value.trim() || "HOME";
-        if (awayTeamInput) scoreboardState.awayTeamName = awayTeamInput.value.trim() || "AWAY";
-        
         // Update scores
         if (homeScoreInput) scoreboardState.homeScore = Math.max(0, Math.min(999, parseInt(homeScoreInput.value) || 0));
         if (awayScoreInput) scoreboardState.awayScore = Math.max(0, Math.min(999, parseInt(awayScoreInput.value) || 0));
