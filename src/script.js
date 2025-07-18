@@ -304,16 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Efficient Firebase Updates ---
     function pushStateToFirebaseEfficient(updates) {
-        const updateData = {};
-        Object.keys(updates).forEach(key => {
-            if (scoreboardState[key] !== updates[key]) {
-                updateData[key] = updates[key];
-            }
-        });
-        
-        if (Object.keys(updateData).length > 0) {
-            set(stateRef, { ...scoreboardState, ...updateData });
-        }
+        // Update local state first
+        Object.assign(scoreboardState, updates);
+        // Update DOM immediately
+        updateDisplay();
+        // Then push to Firebase
+        set(stateRef, scoreboardState);
     }
 
 
@@ -375,30 +371,24 @@ document.addEventListener('DOMContentLoaded', () => {
     onValue(stateRef, (snapshot) => {
         const newState = snapshot.val();
         if (newState) {
-            // Only update if the new state is different from current state
-            const hasChanges = Object.keys(newState).some(key => 
-                scoreboardState[key] !== newState[key]
-            );
+            // Preserve team names if they're not in the new state
+            const currentTeamNames = {
+                homeTeamName: scoreboardState.homeTeamName,
+                awayTeamName: scoreboardState.awayTeamName
+            };
             
-            if (hasChanges) {
-                // Preserve team names if they're not in the new state
-                const currentTeamNames = {
-                    homeTeamName: scoreboardState.homeTeamName,
-                    awayTeamName: scoreboardState.awayTeamName
-                };
-                
-                scoreboardState = { ...scoreboardState, ...newState };
-                
-                // Ensure team names are preserved
-                if (!newState.hasOwnProperty('homeTeamName')) {
-                    scoreboardState.homeTeamName = currentTeamNames.homeTeamName;
-                }
-                if (!newState.hasOwnProperty('awayTeamName')) {
-                    scoreboardState.awayTeamName = currentTeamNames.awayTeamName;
-                }
-                
-                updateDisplay();
+            // Update state
+            scoreboardState = { ...scoreboardState, ...newState };
+            
+            // Ensure team names are preserved if not in update
+            if (!newState.hasOwnProperty('homeTeamName')) {
+                scoreboardState.homeTeamName = currentTeamNames.homeTeamName;
             }
+            if (!newState.hasOwnProperty('awayTeamName')) {
+                scoreboardState.awayTeamName = currentTeamNames.awayTeamName;
+            }
+            
+            updateDisplay();
         }
     });
 
