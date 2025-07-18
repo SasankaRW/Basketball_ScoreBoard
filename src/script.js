@@ -846,7 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyC') { // 'c' - Show Control Panel
             showControlPanel();
         }
-        else if (e.code === 'N' || e.code === 'n') { // 'n' - Set Team Names
+        else if (e.code === 'KeyN' || e.code === 'Keyn') { // 'n' - Set Team Names
             setTeamNames();
         }
         else if (e.code === 'P' || e.code === 'p') { // 'p' - Show Control Panel
