@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basketball Scoreboard - Stream Overlay</title>
+    <link rel="stylesheet" href="stream-overlay.css">
+</head>
+<body>
+    <div class="stream-bar">
+        <!-- Home Team (Left) -->
+        <div class="team-section home-section">
+            <div class="team-box home-box">
+                <span class="team-name" id="stream-home-name">LAC</span>
+                <span class="team-score" id="stream-home-score">0</span>
+            </div>
+        </div>
+
+        <!-- Away Team (Left-Center) -->
+        <div class="team-section away-section">
+            <div class="team-box away-box">
+                <span class="team-name" id="stream-away-name">LAL</span>
+                <span class="team-score" id="stream-away-score">0</span>
+            </div>
+        </div>
+
+        <!-- Center Info (Quarter & Time) -->
+        <div class="center-section">
+            <span class="label" id="stream-quarter">Q1</span>
+            <span class="time" id="stream-game-time">11:24</span>
+        </div>
+
+        <!-- Logo Section (Right) -->
+        <div class="logo-section">
+            <img src="MLogo.png" alt="Stream Logo" class="stream-logo">
+        </div>
+    </div>
+
+    <script type="module" src="stream-overlay.js"></script>
+</body>
+</html>

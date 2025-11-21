@@ -118,28 +118,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Authentication Functions ---
-    function showLoginModal() {
-        if (loginModal) {
-            loginModal.style.display = 'block';
-            if (usernameInput) usernameInput.focus();
-        }
-    }
+    function showLoginPrompt() {
+        const username = prompt('Enter username:');
+        if (username === null) return; // User cancelled
 
-    function hideLoginModal() {
-        if (loginModal) {
-            loginModal.style.display = 'none';
-            if (loginStatus) {
-                loginStatus.textContent = '';
-                loginStatus.className = 'login-status';
-            }
+        const password = prompt('Enter password:');
+        if (password === null) return; // User cancelled
+
+        if (!username.trim() || !password) {
+            alert('Please enter both username and password');
+            return;
         }
+
+        authenticateUser(username.trim(), password);
     }
 
     function showLoginStatus(message, type = 'info') {
-        if (loginStatus) {
-            loginStatus.textContent = message;
-            loginStatus.className = `login-status ${type}`;
-        }
         if (controlLoginStatus) {
             controlLoginStatus.textContent = message;
             controlLoginStatus.className = `login-status ${type}`;
@@ -150,21 +144,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (VALID_CREDENTIALS[username] && VALID_CREDENTIALS[username] === password) {
             isAuthenticated = true;
             currentUser = username;
-            showLoginStatus(`Welcome, ${username}!`, 'success');
+            alert(`Welcome, ${username}!`);
             updateScoreboardAccess();
-            hideLoginModal();
-            
+
             // Store authentication in localStorage
             localStorage.setItem('scoreboardAuth', JSON.stringify({
                 user: username,
                 timestamp: Date.now()
             }));
-            
+
             return true;
         } else {
             isAuthenticated = false;
             currentUser = null;
-            showLoginStatus('Invalid username or password', 'error');
+            alert('Invalid username or password');
             return false;
         }
     }
@@ -173,14 +166,11 @@ document.addEventListener('DOMContentLoaded', () => {
         isAuthenticated = false;
         currentUser = null;
         updateScoreboardAccess();
-        
+
         // Clear localStorage
         localStorage.removeItem('scoreboardAuth');
-        
-        showLoginStatus('Logged out successfully', 'info');
-        setTimeout(() => {
-            hideLoginModal();
-        }, 1500);
+
+        alert('Logged out successfully');
     }
 
     function updateScoreboardAccess() {
@@ -621,10 +611,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Control Panel Functions ---
     function showControlPanel() {
-        if (controlPanelModal) {
-            populateControlPanel();
-            controlPanelModal.style.display = 'block';
-        }
+        return requireAuth(() => {
+            if (controlPanelModal) {
+                populateControlPanel();
+                controlPanelModal.style.display = 'block';
+            }
+        });
     }
 
     function hideControlPanel() {
@@ -661,100 +653,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyControlPanelChanges() {
-        // Update scores
-        if (homeScoreInput) scoreboardState.homeScore = Math.max(0, Math.min(999, parseInt(homeScoreInput.value) || 0));
-        if (awayScoreInput) scoreboardState.awayScore = Math.max(0, Math.min(999, parseInt(awayScoreInput.value) || 0));
-        
-        // Update fouls
-        if (homeFoulsInput) scoreboardState.homeFouls = Math.max(0, Math.min(99, parseInt(homeFoulsInput.value) || 0));
-        if (awayFoulsInput) scoreboardState.awayFouls = Math.max(0, Math.min(99, parseInt(awayFoulsInput.value) || 0));
-        
-        // Update timeouts
-        if (homeTimeoutsInput) scoreboardState.homeTimeouts = Math.max(0, Math.min(99, parseInt(homeTimeoutsInput.value) || 0));
-        if (awayTimeoutsInput) scoreboardState.awayTimeouts = Math.max(0, Math.min(99, parseInt(awayTimeoutsInput.value) || 0));
-        
-        // Update game clock
-        if (gameMinutesInput) scoreboardState.gameMinutes = Math.max(0, Math.min(99, parseInt(gameMinutesInput.value) || 0));
-        if (gameSecondsInput) scoreboardState.gameSeconds = Math.max(0, Math.min(59, parseInt(gameSecondsInput.value) || 0));
-        
-        // Update shot clock
-        if (shotClockInput) scoreboardState.shotClockSeconds = Math.max(0, Math.min(99, parseInt(shotClockInput.value) || 0));
-        
-        // Update quarter
-        if (quarterInput) scoreboardState.quarter = Math.max(1, Math.min(10, parseInt(quarterInput.value) || 1));
-        
-        // Update ball possession
-        if (ballPossessionInput) scoreboardState.ballPossession = ballPossessionInput.value;
-        
-        // Update default settings
-        if (defaultGameMinutesInput) scoreboardState.defaultGameMinutes = Math.max(1, Math.min(99, parseInt(defaultGameMinutesInput.value) || 10));
-        if (defaultShotClockInput) scoreboardState.defaultShotClock = Math.max(1, Math.min(99, parseInt(defaultShotClockInput.value) || 24));
-        if (defaultTimeoutsInput) scoreboardState.defaultTimeouts = Math.max(0, Math.min(99, parseInt(defaultTimeoutsInput.value) || 2));
-        if (defaultQuarterInput) scoreboardState.defaultQuarter = Math.max(1, Math.min(10, parseInt(defaultQuarterInput.value) || 1));
-        if (defaultHomeTeamInput) scoreboardState.defaultHomeTeam = defaultHomeTeamInput.value.trim() || "HOME";
-        if (defaultAwayTeamInput) scoreboardState.defaultAwayTeam = defaultAwayTeamInput.value.trim() || "AWAY";
-        
-        pushStateToFirebase();
-        hideControlPanel();
+        return requireAuth(() => {
+            // Update scores
+            if (homeScoreInput) scoreboardState.homeScore = Math.max(0, Math.min(999, parseInt(homeScoreInput.value) || 0));
+            if (awayScoreInput) scoreboardState.awayScore = Math.max(0, Math.min(999, parseInt(awayScoreInput.value) || 0));
+
+            // Update fouls
+            if (homeFoulsInput) scoreboardState.homeFouls = Math.max(0, Math.min(99, parseInt(homeFoulsInput.value) || 0));
+            if (awayFoulsInput) scoreboardState.awayFouls = Math.max(0, Math.min(99, parseInt(awayFoulsInput.value) || 0));
+
+            // Update timeouts
+            if (homeTimeoutsInput) scoreboardState.homeTimeouts = Math.max(0, Math.min(99, parseInt(homeTimeoutsInput.value) || 0));
+            if (awayTimeoutsInput) scoreboardState.awayTimeouts = Math.max(0, Math.min(99, parseInt(awayTimeoutsInput.value) || 0));
+
+            // Update game clock
+            if (gameMinutesInput) scoreboardState.gameMinutes = Math.max(0, Math.min(99, parseInt(gameMinutesInput.value) || 0));
+            if (gameSecondsInput) scoreboardState.gameSeconds = Math.max(0, Math.min(59, parseInt(gameSecondsInput.value) || 0));
+
+            // Update shot clock
+            if (shotClockInput) scoreboardState.shotClockSeconds = Math.max(0, Math.min(99, parseInt(shotClockInput.value) || 0));
+
+            // Update quarter
+            if (quarterInput) scoreboardState.quarter = Math.max(1, Math.min(10, parseInt(quarterInput.value) || 1));
+
+            // Update ball possession
+            if (ballPossessionInput) scoreboardState.ballPossession = ballPossessionInput.value;
+
+            // Update default settings
+            if (defaultGameMinutesInput) scoreboardState.defaultGameMinutes = Math.max(1, Math.min(99, parseInt(defaultGameMinutesInput.value) || 10));
+            if (defaultShotClockInput) scoreboardState.defaultShotClock = Math.max(1, Math.min(99, parseInt(defaultShotClockInput.value) || 24));
+            if (defaultTimeoutsInput) scoreboardState.defaultTimeouts = Math.max(0, Math.min(99, parseInt(defaultTimeoutsInput.value) || 2));
+            if (defaultQuarterInput) scoreboardState.defaultQuarter = Math.max(1, Math.min(10, parseInt(defaultQuarterInput.value) || 1));
+            if (defaultHomeTeamInput) scoreboardState.defaultHomeTeam = defaultHomeTeamInput.value.trim() || "HOME";
+            if (defaultAwayTeamInput) scoreboardState.defaultAwayTeam = defaultAwayTeamInput.value.trim() || "AWAY";
+
+            pushStateToFirebase();
+            hideControlPanel();
+        });
     }
 
     function applyDefaults() {
-        if (confirm("Apply default settings to current game? This will reset the current game data.")) {
-            // Stop any running clocks
-            stopGameClock();
-            stopShotClock();
-            
-            // Apply default settings to current game
-            scoreboardState.homeScore = 0;
-            scoreboardState.awayScore = 0;
-            scoreboardState.homeFouls = 0;
-            scoreboardState.awayFouls = 0;
-            scoreboardState.homeTimeouts = scoreboardState.defaultTimeouts;
-            scoreboardState.awayTimeouts = scoreboardState.defaultTimeouts;
-            scoreboardState.homeTeamName = scoreboardState.defaultHomeTeam;
-            scoreboardState.awayTeamName = scoreboardState.defaultAwayTeam;
-            scoreboardState.quarter = scoreboardState.defaultQuarter;
-            scoreboardState.ballPossession = 'home';
-            scoreboardState.gameMinutes = scoreboardState.defaultGameMinutes;
-            scoreboardState.gameSeconds = 0;
-            scoreboardState.shotClockSeconds = scoreboardState.defaultShotClock;
-            scoreboardState.isGameClockRunning = false;
-            scoreboardState.isShotClockRunning = false;
-            
-            pushStateToFirebase();
-            hideControlPanel();
-        }
+        return requireAuth(() => {
+            if (confirm("Apply default settings to current game? This will reset the current game data.")) {
+                // Stop any running clocks
+                stopGameClock();
+                stopShotClock();
+
+                // Apply default settings to current game
+                scoreboardState.homeScore = 0;
+                scoreboardState.awayScore = 0;
+                scoreboardState.homeFouls = 0;
+                scoreboardState.awayFouls = 0;
+                scoreboardState.homeTimeouts = scoreboardState.defaultTimeouts;
+                scoreboardState.awayTimeouts = scoreboardState.defaultTimeouts;
+                scoreboardState.homeTeamName = scoreboardState.defaultHomeTeam;
+                scoreboardState.awayTeamName = scoreboardState.defaultAwayTeam;
+                scoreboardState.quarter = scoreboardState.defaultQuarter;
+                scoreboardState.ballPossession = 'home';
+                scoreboardState.gameMinutes = scoreboardState.defaultGameMinutes;
+                scoreboardState.gameSeconds = 0;
+                scoreboardState.shotClockSeconds = scoreboardState.defaultShotClock;
+                scoreboardState.isGameClockRunning = false;
+                scoreboardState.isShotClockRunning = false;
+
+                pushStateToFirebase();
+                hideControlPanel();
+            }
+        });
     }
 
     function resetAllData() {
-        if (confirm("Are you sure you want to reset all data? This will set everything back to default values.")) {
-            scoreboardState = {
-                homeScore: 0,
-                awayScore: 0,
-                homeFouls: 0,
-                awayFouls: 0,
-                homeTimeouts: scoreboardState.defaultTimeouts,
-                awayTimeouts: scoreboardState.defaultTimeouts,
-                homeTeamName: scoreboardState.defaultHomeTeam,
-                awayTeamName: scoreboardState.defaultAwayTeam,
-                quarter: scoreboardState.defaultQuarter,
-                ballPossession: 'home',
-                gameMinutes: scoreboardState.defaultGameMinutes,
-                gameSeconds: 0,
-                shotClockSeconds: scoreboardState.defaultShotClock,
-                isGameClockRunning: false,
-                isShotClockRunning: false,
-                // Preserve default settings
-                defaultGameMinutes: scoreboardState.defaultGameMinutes,
-                defaultShotClock: scoreboardState.defaultShotClock,
-                defaultTimeouts: scoreboardState.defaultTimeouts,
-                defaultQuarter: scoreboardState.defaultQuarter,
-                defaultHomeTeam: scoreboardState.defaultHomeTeam,
-                defaultAwayTeam: scoreboardState.defaultAwayTeam
-            };
-            pushStateToFirebase();
-            hideControlPanel();
-        }
+        return requireAuth(() => {
+            if (confirm("Are you sure you want to reset all data? This will set everything back to default values.")) {
+                scoreboardState = {
+                    homeScore: 0,
+                    awayScore: 0,
+                    homeFouls: 0,
+                    awayFouls: 0,
+                    homeTimeouts: scoreboardState.defaultTimeouts,
+                    awayTimeouts: scoreboardState.defaultTimeouts,
+                    homeTeamName: scoreboardState.defaultHomeTeam,
+                    awayTeamName: scoreboardState.defaultAwayTeam,
+                    quarter: scoreboardState.defaultQuarter,
+                    ballPossession: 'home',
+                    gameMinutes: scoreboardState.defaultGameMinutes,
+                    gameSeconds: 0,
+                    shotClockSeconds: scoreboardState.defaultShotClock,
+                    isGameClockRunning: false,
+                    isShotClockRunning: false,
+                    // Preserve default settings
+                    defaultGameMinutes: scoreboardState.defaultGameMinutes,
+                    defaultShotClock: scoreboardState.defaultShotClock,
+                    defaultTimeouts: scoreboardState.defaultTimeouts,
+                    defaultQuarter: scoreboardState.defaultQuarter,
+                    defaultHomeTeam: scoreboardState.defaultHomeTeam,
+                    defaultAwayTeam: scoreboardState.defaultAwayTeam
+                };
+                pushStateToFirebase();
+                hideControlPanel();
+            }
+        });
     }
     // --- Help Modal Functions ---
      const showHelp = () => {
@@ -860,40 +858,32 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyC') { // 'c' - Show Control Panel
             showControlPanel();
         }
-        else if (e.code === 'KeyN' || e.code === 'n') { // 'n' - Set Team Names
+        else if (e.code === 'KeyN') { // 'n' - Set Team Names
             setTeamNames();
         }
-        else if (e.code === 'P' || e.code === 'p') { // 'p' - Show Control Panel
+        else if (e.code === 'KeyP') { // 'p' - Show Control Panel
             showControlPanel();
         }
-        else if (e.code === 'O' || e.code === 'o') { // 'o' - Hide Control Panel
+        else if (e.code === 'KeyO') { // 'o' - Hide Control Panel
             hideControlPanel();
         }
-        else if (e.code === 'R' || e.code === 'r') { // 'r' - Apply Control Panel Changes
+        else if (e.code === 'KeyR') { // 'r' - Apply Control Panel Changes
             applyControlPanelChanges();
         }
-        else if (e.code === 'A' || e.code === 'a') { // 'a' - Reset All Data
+        else if (e.code === 'KeyA') { // 'a' - Reset All Data
             resetAllData();
         }
-        else if (e.code === 'D' || e.code === 'd') { // 'd' - Apply Defaults
+        else if (e.code === 'KeyD') { // 'd' - Apply Defaults
             applyDefaults();
         }
-        else if (e.code === 'KeyL' || e.code === 'l') { // 'l' - Show Login Modal
+        else if (e.code === 'KeyL') { // 'l' - Show Login Prompt
             e.preventDefault();
-            showLoginModal();
+            showLoginPrompt();
         }
     });
 
      // --- Modal Event Listeners ---
     if (closeModalBtn) closeModalBtn.addEventListener('click', hideHelp);
-    window.addEventListener('click', (event) => {
-        if (event.target === helpModal) {
-            hideHelp();
-        }
-        if (event.target === controlPanelModal) {
-            hideControlPanel();
-        }
-    });
 
     // --- Control Panel Event Listeners ---
     if (controlCloseBtn) controlCloseBtn.addEventListener('click', hideControlPanel);
@@ -906,74 +896,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (applyDefaultsBtn) applyDefaultsBtn.addEventListener('click', applyDefaults);
 
     // --- Authentication Event Listeners ---
-    if (loginBtn) loginBtn.addEventListener('click', () => {
-        const username = usernameInput ? usernameInput.value.trim() : '';
-        const password = passwordInput ? passwordInput.value : '';
-        
-        if (!username || !password) {
-            showLoginStatus('Please enter both username and password', 'error');
-            return;
-        }
-        
-        authenticateUser(username, password);
-    });
+    if (loginBtn) loginBtn.addEventListener('click', showLoginPrompt);
 
     if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
     // --- Control Panel Authentication Event Listeners ---
-    if (controlLoginBtn) controlLoginBtn.addEventListener('click', () => {
-        const username = controlUsernameInput ? controlUsernameInput.value.trim() : '';
-        const password = controlPasswordInput ? controlPasswordInput.value : '';
-        
-        if (!username || !password) {
-            showLoginStatus('Please enter both username and password', 'error');
-            return;
-        }
-        
-        authenticateUser(username, password);
-    });
+    if (controlLoginBtn) controlLoginBtn.addEventListener('click', showLoginPrompt);
 
     if (controlLogoutBtn) controlLogoutBtn.addEventListener('click', logout);
 
-    // Handle Enter key in login form
-    if (usernameInput) {
-        usernameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && passwordInput) {
-                passwordInput.focus();
-            }
-        });
-    }
-
-    if (passwordInput) {
-        passwordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                loginBtn.click();
-            }
-        });
-    }
-
-    // Handle Enter key in control panel login form
-    if (controlUsernameInput) {
-        controlUsernameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && controlPasswordInput) {
-                controlPasswordInput.focus();
-            }
-        });
-    }
-
-    if (controlPasswordInput) {
-        controlPasswordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                controlLoginBtn.click();
-            }
-        });
-    }
-
-    // Close login modal when clicking outside
+    // Close modals when clicking outside
     window.addEventListener('click', (event) => {
-        if (event.target === loginModal) {
-            hideLoginModal();
-        }
         if (event.target === helpModal) {
             hideHelp();
         }

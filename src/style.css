@@ -91,7 +91,7 @@ body {
     line-height: 1;
     color: var(--score-blue);
     background-color: var(--score-blue-bg);
-  
+
     border-radius: 8px;
     margin: 0.5rem auto 1.5rem;
     min-width: 1.8em;
@@ -100,6 +100,7 @@ body {
     justify-content: center;
     align-items: center;
     box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.4);
+    transform: scale(0.9);
 }
 
 .stats {
@@ -342,7 +343,7 @@ body {
 }
 
 .logo {
-    width: clamp(80px, 15vw, 150px);
+    width: clamp(130px, 24vw, 350px);
     height: auto;
     opacity: 0.8;
     transition: opacity 0.3s ease;
