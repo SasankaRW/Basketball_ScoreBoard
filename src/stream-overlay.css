@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Roboto:wght@700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto:wght@700&display=swap');
 
 * {
     margin: 0;
@@ -55,19 +55,25 @@ body {
 }
 
 .team-box.home-box {
-    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+}
+
+.team-box.home-box .team-name,
+.team-box.home-box .team-score {
+    color: #0c4a6e;
+    text-shadow: none;
 }
 
 .team-box.home-box::before {
-    background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+    background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%);
 }
 
 .team-box.away-box {
-    background: linear-gradient(135deg, #5b21b6 0%, #4c1d95 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
 .team-box.away-box::before {
-    background: linear-gradient(180deg, #fcd34d 0%, #fbbf24 100%);
+    background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%);
 }
 
 .team-box:hover {
@@ -75,9 +81,9 @@ body {
 }
 
 .team-name {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Orbitron', sans-serif;
     font-size: 1.4rem;
-    font-weight: 900;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: #ffffff;
@@ -86,9 +92,9 @@ body {
 }
 
 .team-score {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Orbitron', monospace;
     font-size: 2.6rem;
-    font-weight: 900;
+    font-weight: 700;
     color: #ffffff;
     background: transparent;
     padding: 0;
@@ -111,9 +117,9 @@ body {
 }
 
 .label {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Orbitron', sans-serif;
     font-size: 1.3rem;
-    font-weight: 900;
+    font-weight: 700;
     color: #ffffff;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -131,9 +137,9 @@ body {
 }
 
 .time {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Orbitron', sans-serif;
     font-size: 1.8rem;
-    font-weight: 900;
+    font-weight: 700;
     color: #ffffff;
     background: transparent;
     padding: 0;
