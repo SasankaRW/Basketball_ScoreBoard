@@ -27,13 +27,23 @@ const streamQuarterEl = document.getElementById('stream-quarter');
 // Listen to Firebase for real-time updates
 const stateRef = ref(db, 'scoreboardState');
 
+// Helper function to format team names for two lines if two words
+function formatTeamName(name) {
+    if (!name) return 'TEAM';
+    const words = name.trim().split(/\s+/);
+    if (words.length === 2) {
+        return words.join('\n'); // Add line break between two words
+    }
+    return name;
+}
+
 onValue(stateRef, (snapshot) => {
     const data = snapshot.val();
 
     if (data) {
-        // Update team names
-        if (streamHomeNameEl) streamHomeNameEl.textContent = data.homeTeamName || 'HOME';
-        if (streamAwayNameEl) streamAwayNameEl.textContent = data.awayTeamName || 'AWAY';
+        // Update team names with two-line formatting
+        if (streamHomeNameEl) streamHomeNameEl.textContent = formatTeamName(data.homeTeamName || 'HOME');
+        if (streamAwayNameEl) streamAwayNameEl.textContent = formatTeamName(data.awayTeamName || 'AWAY');
 
         // Update scores
         if (streamHomeScoreEl) streamHomeScoreEl.textContent = data.homeScore || 0;
@@ -49,7 +59,11 @@ onValue(stateRef, (snapshot) => {
         // Update quarter
         if (streamQuarterEl) {
             const quarter = data.quarter || 1;
-            streamQuarterEl.textContent = `Q${quarter}`;
+            if (quarter <= 4) {
+                streamQuarterEl.textContent = `Q${quarter}`;
+            } else {
+                streamQuarterEl.textContent = `OT${quarter - 4}`;
+            }
         }
     }
 });

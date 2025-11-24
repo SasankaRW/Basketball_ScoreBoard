@@ -3,13 +3,13 @@ import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebase
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyB0I8H2bAIFMMB01n-4p-G3ogxbmp3Nii8",
-  authDomain: "basketballscoreboard-65c95.firebaseapp.com",
-  databaseURL: "https://basketballscoreboard-65c95-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "basketballscoreboard-65c95",
-  storageBucket: "basketballscoreboard-65c95.firebasestorage.app",
-  messagingSenderId: "31697951521",
-  appId: "1:31697951521:web:074259ad89964d30437c60"
+    apiKey: "AIzaSyB0I8H2bAIFMMB01n-4p-G3ogxbmp3Nii8",
+    authDomain: "basketballscoreboard-65c95.firebaseapp.com",
+    databaseURL: "https://basketballscoreboard-65c95-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "basketballscoreboard-65c95",
+    storageBucket: "basketballscoreboard-65c95.firebasestorage.app",
+    messagingSenderId: "31697951521",
+    appId: "1:31697951521:web:074259ad89964d30437c60"
 };
 
 // Initialize Firebase
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopGameClockBtn = document.getElementById('stop-game-clock');
     const startShotClockBtn = document.getElementById('start-shot-clock');
     const stopShotClockBtn = document.getElementById('stop-shot-clock');
-    
+
     // Default Settings Elements
     const defaultGameMinutesInput = document.getElementById('default-game-minutes');
     const defaultShotClockInput = document.getElementById('default-shot-clock');
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const defaultHomeTeamInput = document.getElementById('default-home-team');
     const defaultAwayTeamInput = document.getElementById('default-away-team');
     const applyDefaultsBtn = document.getElementById('apply-defaults');
-    
+
     // Authentication Elements
     const loginModal = document.getElementById('login-modal');
     const usernameInput = document.getElementById('username-input');
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logout-btn');
     const loginStatus = document.getElementById('login-status');
     const scoreboardEl = document.querySelector('.scoreboard');
-    
+
     // Control Panel Authentication Elements
     const controlUsernameInput = document.getElementById('control-username-input');
     const controlPasswordInput = document.getElementById('control-password-input');
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Authentication State
     let isAuthenticated = false;
     let currentUser = null;
-    
+
     // Default credentials (you can change these)
     const VALID_CREDENTIALS = {
         'admin': 'scoreboard123',
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scoreboardEl) {
             // Remove locked class - allow viewing for all users
             scoreboardEl.classList.remove('locked');
-            
+
             if (isAuthenticated) {
                 if (logoutBtn) logoutBtn.style.display = 'inline-block';
                 if (loginBtn) loginBtn.style.display = 'none';
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const auth = JSON.parse(savedAuth);
                 const now = Date.now();
                 const authAge = now - auth.timestamp;
-                
+
                 // Check if authentication is less than 24 hours old
                 if (authAge < 24 * 60 * 60 * 1000) {
                     isAuthenticated = true;
@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.removeItem('scoreboardAuth');
             }
         }
-        
+
         // Don't show login modal automatically - allow viewing for all users
         updateScoreboardAccess();
         return false;
@@ -238,12 +238,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (awayScoreEl) awayScoreEl.textContent = String(scoreboardState.awayScore).padStart(2, '0');
         if (gameClockEl) gameClockEl.textContent = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
         if (shotClockEl) shotClockEl.textContent = String(scoreboardState.shotClockSeconds).padStart(2, '0');
-        if (quarterEl) quarterEl.textContent = `Q${scoreboardState.quarter}`;
+        if (quarterEl) {
+            if (scoreboardState.quarter <= 4) {
+                quarterEl.textContent = `Q${scoreboardState.quarter}`;
+            } else {
+                quarterEl.textContent = `OT${scoreboardState.quarter - 4}`;
+            }
+        }
         if (homeFoulsEl) homeFoulsEl.textContent = scoreboardState.homeFouls;
         if (awayFoulsEl) awayFoulsEl.textContent = scoreboardState.awayFouls;
         if (homeTimeoutsEl) homeTimeoutsEl.textContent = scoreboardState.homeTimeouts;
         if (awayTimeoutsEl) awayTimeoutsEl.textContent = scoreboardState.awayTimeouts;
-        
+
         // Update team names
         const homeTeamNameEl = document.getElementById('home-team-name');
         const awayTeamNameEl = document.getElementById('away-team-name');
@@ -283,10 +289,10 @@ document.addEventListener('DOMContentLoaded', () => {
             arrowDiv.id = 'away-possession-arrow';
             awayTeamNameEl.appendChild(arrowDiv);
         }
-        
+
         // Update ball possession indicator
         updateBallPossessionIndicator();
-        
+
         // Update foul bonus styling
         updateFoulBonusStyling();
     };
@@ -312,59 +318,49 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateBallPossessionIndicator() {
         const homeArrow = document.getElementById('home-possession-arrow');
         const awayArrow = document.getElementById('away-possession-arrow');
-        
-   
-        
+
+
+
         if (homeArrow && awayArrow) {
             // Clear both arrows first
             homeArrow.classList.remove('active');
             awayArrow.classList.remove('active');
-            
-            
-            
+
+
+
             if (scoreboardState.ballPossession === 'home') {
-                homeArrow.textContent = '◀';
                 homeArrow.classList.add('active');
-                
+
             } else {
-                awayArrow.textContent = '▶';
                 awayArrow.classList.add('active');
-               
+
             }
         } else {
-           
+
         }
     }
 
     // --- Foul Bonus Styling ---
     function updateFoulBonusStyling() {
-        // Get foul stat lines
-        const homeFoulStatLine = document.querySelector('.team.home .stat-line.foul');
-        const awayFoulStatLine = document.querySelector('.team.away .stat-line.foul');
-        
-        // Check if home team just reached bonus
-        const wasHomeBonus = homeFoulStatLine && homeFoulStatLine.classList.contains('bonus');
-        const isHomeBonus = scoreboardState.homeFouls >= 5;
-        
-        // Check if away team just reached bonus
-        const wasAwayBonus = awayFoulStatLine && awayFoulStatLine.classList.contains('bonus');
-        const isAwayBonus = scoreboardState.awayFouls >= 5;
-        
+        // Get foul boxes
+        const homeFoulBox = document.querySelector('.foul-box.home');
+        const awayFoulBox = document.querySelector('.foul-box.away');
+
         // Update home team foul styling
-        if (homeFoulStatLine) {
-            if (isHomeBonus) {
-                homeFoulStatLine.classList.add('bonus');
+        if (homeFoulBox) {
+            if (scoreboardState.homeFouls >= 5) {
+                homeFoulBox.classList.add('penalty');
             } else {
-                homeFoulStatLine.classList.remove('bonus');
+                homeFoulBox.classList.remove('penalty');
             }
         }
-        
+
         // Update away team foul styling
-        if (awayFoulStatLine) {
-            if (isAwayBonus) {
-                awayFoulStatLine.classList.add('bonus');
+        if (awayFoulBox) {
+            if (scoreboardState.awayFouls >= 5) {
+                awayFoulBox.classList.add('penalty');
             } else {
-                awayFoulStatLine.classList.remove('bonus');
+                awayFoulBox.classList.remove('penalty');
             }
         }
     }
@@ -380,10 +376,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 homeTeamName: scoreboardState.homeTeamName,
                 awayTeamName: scoreboardState.awayTeamName
             };
-            
+
             // Update state
             scoreboardState = { ...scoreboardState, ...newState };
-            
+
             // Ensure team names are preserved if not in update
             if (!newState.hasOwnProperty('homeTeamName')) {
                 scoreboardState.homeTeamName = currentTeamNames.homeTeamName;
@@ -391,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!newState.hasOwnProperty('awayTeamName')) {
                 scoreboardState.awayTeamName = currentTeamNames.awayTeamName;
             }
-            
+
             updateDisplay();
         }
     });
@@ -407,32 +403,33 @@ document.addEventListener('DOMContentLoaded', () => {
             stopGameClock();
             const gameOverSound = document.getElementById('game-over-sound');
             if (gameOverSound) {
-                gameOverSound.currentTime = 0; 
+                gameOverSound.currentTime = 0;
                 gameOverSound.play().catch(() => {
                     // Handle autoplay restrictions silently
                 });
             }
-            alert("Game Over!");
+            // Alert removed - sound plays immediately
         }
         // Only update game clock in Firebase, not the entire state
-        pushStateToFirebaseEfficient({ 
-            gameMinutes: scoreboardState.gameMinutes, 
-            gameSeconds: scoreboardState.gameSeconds 
+        pushStateToFirebaseEfficient({
+            gameMinutes: scoreboardState.gameMinutes,
+            gameSeconds: scoreboardState.gameSeconds
         });
     }
     function tickShotClock() {
         if (scoreboardState.shotClockSeconds > 0) {
             scoreboardState.shotClockSeconds--;
-            
+
             // Play shot clock buzzer when it reaches 1 second (not 0)
             if (scoreboardState.shotClockSeconds === 0) {
-                const shotClockSound = document.getElementById('shotclock-sound');
+                // Shot clock sound disabled
+                /* const shotClockSound = document.getElementById('shotclock-sound');
                 if (shotClockSound) {
                     shotClockSound.currentTime = 0;
                     shotClockSound.play().catch(() => {
                         // Handle autoplay restrictions silently
                     });
-                }
+                } */
             }
         } else {
             stopShotClock();
@@ -464,11 +461,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function startShotClock() {
         return requireAuth(() => {
             if (!scoreboardState.isShotClockRunning && scoreboardState.shotClockSeconds > 0) {
-            clearInterval(shotClockTimerInterval);
-            shotClockTimerInterval = setInterval(tickShotClock, 1000);
+                clearInterval(shotClockTimerInterval);
+                shotClockTimerInterval = setInterval(tickShotClock, 1000);
                 scoreboardState.isShotClockRunning = true;
                 if (shotClockEl) {
-            shotClockEl.style.backgroundColor = '';
+                    shotClockEl.style.backgroundColor = '';
                     shotClockEl.style.color = '';
                 }
                 pushStateToFirebase();
@@ -477,20 +474,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function stopShotClock() {
         return requireAuth(() => {
-        clearInterval(shotClockTimerInterval);
+            clearInterval(shotClockTimerInterval);
             scoreboardState.isShotClockRunning = false;
             pushStateToFirebase();
         });
     }
     function resetGameClock() {
         return requireAuth(() => {
-        if (confirm("Are you sure you want to reset the game clock?")) {
-            stopGameClock();
-            const gameOverSound = document.getElementById('game-over-sound');
-            if (gameOverSound) {
-                gameOverSound.pause();
-                gameOverSound.currentTime = 0;
-            }
+            if (confirm("Are you sure you want to reset the game clock?")) {
+                stopGameClock();
+                const gameOverSound = document.getElementById('game-over-sound');
+                if (gameOverSound) {
+                    gameOverSound.pause();
+                    gameOverSound.currentTime = 0;
+                }
                 scoreboardState.gameMinutes = 10;
                 scoreboardState.gameSeconds = 0;
                 pushStateToFirebase();
@@ -515,40 +512,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Control Functions ---
     function adjustScore(team, delta) {
         return requireAuth(() => {
-        if (team === 'home') {
+            if (team === 'home') {
                 scoreboardState.homeScore = Math.max(0, Math.min(999, scoreboardState.homeScore + delta));
-        } else if (team === 'away') {
+            } else if (team === 'away') {
                 scoreboardState.awayScore = Math.max(0, Math.min(999, scoreboardState.awayScore + delta));
             }
-            pushStateToFirebaseEfficient({ 
-                homeScore: scoreboardState.homeScore, 
-                awayScore: scoreboardState.awayScore 
+            pushStateToFirebaseEfficient({
+                homeScore: scoreboardState.homeScore,
+                awayScore: scoreboardState.awayScore
             });
         });
     }
     function adjustFouls(team, delta) {
         return requireAuth(() => {
-        if (team === 'home') {
+            if (team === 'home') {
                 scoreboardState.homeFouls = Math.max(0, Math.min(99, scoreboardState.homeFouls + delta));
-        } else if (team === 'away') {
+            } else if (team === 'away') {
                 scoreboardState.awayFouls = Math.max(0, Math.min(99, scoreboardState.awayFouls + delta));
             }
-            pushStateToFirebaseEfficient({ 
-                homeFouls: scoreboardState.homeFouls, 
-                awayFouls: scoreboardState.awayFouls 
+            pushStateToFirebaseEfficient({
+                homeFouls: scoreboardState.homeFouls,
+                awayFouls: scoreboardState.awayFouls
             });
         });
     }
     function adjustTimeouts(team, delta) {
         return requireAuth(() => {
-        if (team === 'home') {
+            if (team === 'home') {
                 scoreboardState.homeTimeouts = Math.max(0, Math.min(99, scoreboardState.homeTimeouts + delta));
-        } else if (team === 'away') {
+            } else if (team === 'away') {
                 scoreboardState.awayTimeouts = Math.max(0, Math.min(99, scoreboardState.awayTimeouts + delta));
             }
-            pushStateToFirebaseEfficient({ 
-                homeTimeouts: scoreboardState.homeTimeouts, 
-                awayTimeouts: scoreboardState.awayTimeouts 
+            pushStateToFirebaseEfficient({
+                homeTimeouts: scoreboardState.homeTimeouts,
+                awayTimeouts: scoreboardState.awayTimeouts
             });
         });
     }
@@ -570,22 +567,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return requireAuth(() => {
             stopGameClock();
             const timeInput = prompt("Enter game time (MM:SS):", `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`);
-        if (timeInput) {
-            const parts = timeInput.split(':');
-            if (parts.length === 2) {
-                const mins = parseInt(parts[0], 10);
-                const secs = parseInt(parts[1], 10);
-                if (!isNaN(mins) && !isNaN(secs) && mins >= 0 && secs >= 0 && secs < 60) {
+            if (timeInput) {
+                const parts = timeInput.split(':');
+                if (parts.length === 2) {
+                    const mins = parseInt(parts[0], 10);
+                    const secs = parseInt(parts[1], 10);
+                    if (!isNaN(mins) && !isNaN(secs) && mins >= 0 && secs >= 0 && secs < 60) {
                         scoreboardState.gameMinutes = mins;
                         scoreboardState.gameSeconds = secs;
                         pushStateToFirebase();
+                    } else {
+                        alert("Invalid time format. Please use MM:SS.");
+                    }
                 } else {
                     alert("Invalid time format. Please use MM:SS.");
                 }
-            } else {
-                 alert("Invalid time format. Please use MM:SS.");
             }
-        }
             if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock STOPPED";
         });
     }
@@ -596,16 +593,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (homeName !== null) {
             scoreboardState.homeTeamName = homeName.trim() || "HOME";
         }
-        
+
         const awayName = prompt("Enter Away Team Name:", scoreboardState.awayTeamName);
         if (awayName !== null) {
             scoreboardState.awayTeamName = awayName.trim() || "AWAY";
         }
-        
+
         // Only update team names in Firebase when they're actually changed
-        pushStateToFirebaseEfficient({ 
-            homeTeamName: scoreboardState.homeTeamName, 
-            awayTeamName: scoreboardState.awayTeamName 
+        pushStateToFirebaseEfficient({
+            homeTeamName: scoreboardState.homeTeamName,
+            awayTeamName: scoreboardState.awayTeamName
         });
     }
 
@@ -637,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameMinutesInput) gameMinutesInput.value = scoreboardState.gameMinutes;
         if (gameSecondsInput) gameSecondsInput.value = scoreboardState.gameSeconds;
         if (shotClockInput) shotClockInput.value = scoreboardState.shotClockSeconds;
-        
+
         // Populate default settings
         if (defaultGameMinutesInput) defaultGameMinutesInput.value = scoreboardState.defaultGameMinutes;
         if (defaultShotClockInput) defaultShotClockInput.value = scoreboardState.defaultShotClock;
@@ -645,7 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (defaultQuarterInput) defaultQuarterInput.value = scoreboardState.defaultQuarter;
         if (defaultHomeTeamInput) defaultHomeTeamInput.value = scoreboardState.defaultHomeTeam;
         if (defaultAwayTeamInput) defaultAwayTeamInput.value = scoreboardState.defaultAwayTeam;
-        
+
         // Clear authentication fields
         if (controlUsernameInput) controlUsernameInput.value = '';
         if (controlPasswordInput) controlPasswordInput.value = '';
@@ -755,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     // --- Help Modal Functions ---
-     const showHelp = () => {
+    const showHelp = () => {
         if (helpModal) helpModal.style.display = 'block';
     };
     const hideHelp = () => {
@@ -781,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Keyboard Event Listener ---
     document.addEventListener('keydown', (e) => {
-        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight','KeyC' ,'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC','KeyQ', 'KeyB', 'Enter', 'KeyN', 'KeyP', 'KeyO', 'KeyA', 'KeyD', 'KeyL'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX', 'KeyQ'].includes(e.code))) {
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyC', 'KeyR', 'KeyS', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyH', 'KeyZ', 'KeyX', 'KeyC', 'KeyQ', 'KeyB', 'Enter', 'KeyN', 'KeyP', 'KeyO', 'KeyA', 'KeyD', 'KeyL'].includes(e.code) || (e.shiftKey && ['KeyR', 'KeyF', 'KeyJ', 'KeyT', 'KeyY', 'KeyZ', 'KeyX', 'KeyQ'].includes(e.code))) {
             e.preventDefault();
         }
 
@@ -794,16 +791,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         else if (e.code === 'Space' && !e.shiftKey) { // Shot Clock Toggle
-             if (scoreboardState.isShotClockRunning) {
-                 stopShotClock();
-             } else {
-                 startShotClock();
-             }
+            if (scoreboardState.isShotClockRunning) {
+                stopShotClock();
+            } else {
+                startShotClock();
+            }
         }
         else if (e.code === 'KeyR' && !e.shiftKey) { // 'r' - Reset Shot Clock (24s)
             resetShotClock(24);
         }
-         else if (e.code === 'KeyR' && e.shiftKey) { // Shift + 'r' - Reset Shot Clock (14s)
+        else if (e.code === 'KeyR' && e.shiftKey) { // Shift + 'r' - Reset Shot Clock (14s)
             resetShotClock(14);
         }
 
@@ -819,7 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'KeyJ' && !e.shiftKey) { adjustFouls('away', 1); }
         else if (e.code === 'KeyJ' && e.shiftKey) { adjustFouls('away', -1); }
 
-         // Timeout Controls
+        // Timeout Controls
         else if (e.code === 'KeyZ' && !e.shiftKey) { adjustTimeouts('home', -1); }
         else if (e.code === 'KeyZ' && e.shiftKey) { adjustTimeouts('home', 1); }
         else if (e.code === 'KeyX' && !e.shiftKey) { adjustTimeouts('away', -1); }
@@ -849,11 +846,11 @@ document.addEventListener('DOMContentLoaded', () => {
             resetGameClock();
         }
         else if (e.code === 'KeyH') { // 'h' - Toggle Help
-             if (helpModal && helpModal.style.display === 'block') {
-                 hideHelp();
-             } else {
-                 showHelp();
-             }
+            if (helpModal && helpModal.style.display === 'block') {
+                hideHelp();
+            } else {
+                showHelp();
+            }
         }
         else if (e.code === 'KeyC') { // 'c' - Show Control Panel
             showControlPanel();
@@ -882,7 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-     // --- Modal Event Listeners ---
+    // --- Modal Event Listeners ---
     if (closeModalBtn) closeModalBtn.addEventListener('click', hideHelp);
 
     // --- Control Panel Event Listeners ---
@@ -920,12 +917,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Pre-load and enable sounds after user interaction
         const gameOverSound = document.getElementById('game-over-sound');
         const shotClockSound = document.getElementById('shotclock-sound');
-        
+
         if (gameOverSound) {
             gameOverSound.volume = 0.7;
             gameOverSound.load();
         }
-        
+
         if (shotClockSound) {
             shotClockSound.volume = 0.8;
             shotClockSound.load();
@@ -937,13 +934,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize authentication
     checkAuthentication();
-    
+
     // Initialize sounds on first user interaction
     document.addEventListener('click', function initSounds() {
         initializeSounds();
         document.removeEventListener('click', initSounds);
     }, { once: true });
-    
+
     document.addEventListener('keydown', function initSounds() {
         initializeSounds();
         document.removeEventListener('keydown', initSounds);

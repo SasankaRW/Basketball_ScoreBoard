@@ -15,17 +15,18 @@ body {
 }
 
 .stream-bar {
-    display: inline-flex;
+    display: flex;
     align-items: stretch;
     background: transparent;
     padding: 0;
-    width: auto;
+    width: fit-content;
+    max-width: 100%;
     gap: 0;
     height: 70px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 4px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 /* Team Sections */
@@ -43,6 +44,7 @@ body {
     border: none;
     transition: none;
     position: relative;
+    flex: 0 1 auto;
 }
 
 .team-box::before {
@@ -89,6 +91,11 @@ body {
     color: #ffffff;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     min-width: 70px;
+    white-space: pre-line;
+    word-break: break-word;
+    line-height: 1.2;
+    display: inline-block;
+    flex: 1 1 auto;
 }
 
 .team-score {
@@ -99,10 +106,11 @@ body {
     background: transparent;
     padding: 0;
     border-radius: 0;
-    min-width: 60px;
+    min-width: 50px;
     text-align: left;
     box-shadow: none;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
 }
 
 /* Center Section (Time & Quarter) */
@@ -114,6 +122,7 @@ body {
     gap: 1rem;
     height: 70px;
     border: none;
+    flex-shrink: 0;
 }
 
 .label {
@@ -149,6 +158,9 @@ body {
     letter-spacing: 1px;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     transition: none;
+    width: 110px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
 }
 
 .time:hover {
@@ -162,6 +174,8 @@ body {
     background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
     padding: 0 1.8rem;
     height: 70px;
+    flex-shrink: 0;
+    min-width: fit-content;
 }
 
 .stream-logo {

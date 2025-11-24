@@ -1,67 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Basketball Scoreboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    
+
     <div class="scoreboard">
-        <!-- Home Section -->
-        <div class="team home">
-            <div class="team-name" id="home-team-name" tabindex="0">
+        <!-- Top Section: Game Clock -->
+        <div class="header-section">
+            <div class="game-clock" id="game-clock">10:00</div>
+        </div>
+
+        <!-- Middle Section: Team Names -->
+        <div class="names-section">
+            <div class="team-name home" id="home-team-name">
                 HOME
                 <div class="possession-arrow" id="home-possession-arrow"></div>
             </div>
-            <div class="score" id="home-score">00</div>
-            <div class="stats">
-                <div class="stat-line foul">
-                    <span class="label">FOULS</span>
-                    <span class="value" id="home-fouls">0</span>
-                </div>
-                <div class="stat-line timeout">
-                    <span class="label">TIMEOUTS LEFT</span>
-                    <span class="value" id="home-timeouts">2</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Center Section -->
-        <div class="center-console">
-            <div class="clock-container">
-                <div class="clock-label">GAME TIME</div>
-                <div class="game-clock" id="game-clock">12:00</div>
-            </div>
-            <div class="clock-container">
-                <div class="clock-label">SHOT CLOCK</div>
-                <div class="shot-clock" id="shot-clock">24</div>
-            </div>
-            <div class="quarter-display" id="quarter-display">Q1</div>
-            <img src="MLogo.png" alt="Basketball Logo" class="logo">
-            <div class="controls-info" id="controls-info">
-                Press 'H' for Help
-            </div>
-        </div>
-
-        <!-- Away Section -->
-        <div class="team away">
-            <div class="team-name" id="away-team-name" tabindex="0">
-                AWAY
+            <div class="team-name away" id="away-team-name">
+                GUEST
                 <div class="possession-arrow" id="away-possession-arrow"></div>
             </div>
-            <div class="score" id="away-score">00</div>
-            <div class="stats">
-                <div class="stat-line foul">
-                    <span class="label">FOULS</span>
-                    <span class="value" id="away-fouls">0</span>
+        </div>
+
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <img src="MLogo.png" class="quarter-logo" alt="Logo">
+        </div>
+
+        <!-- Quarter Display -->
+        <div class="quarter-section">
+            <div class="quarter-display" id="quarter-display">Q1</div>
+        </div>
+
+        <!-- Bottom Section: Scores & Fouls -->
+        <div class="main-section">
+            <!-- Home Score -->
+            <div class="score-container home">
+                <div class="score" id="home-score">00</div>
+            </div>
+
+            <!-- Center Fouls -->
+            <div class="fouls-section">
+                <div class="foul-box home">
+                    <div class="foul-label">FOULS</div>
+                    <div class="foul-value" id="home-fouls">0</div>
                 </div>
-                <div class="stat-line timeout">
-                    <span class="label">TIMEOUTS LEFT</span>
-                    <span class="value" id="away-timeouts">2</span>
+                <div class="foul-box away">
+                    <div class="foul-label">FOULS</div>
+                    <div class="foul-value" id="away-fouls">0</div>
                 </div>
             </div>
+
+            <!-- Away Score -->
+            <div class="score-container away">
+                <div class="score" id="away-score">00</div>
+            </div>
+        </div>
+
+        <!-- Hidden elements to preserve JS functionality without errors -->
+        <div style="display: none;">
+            <div id="shot-clock">24</div>
+            <div id="home-timeouts">2</div>
+            <div id="away-timeouts">2</div>
+            <div id="controls-info"></div>
         </div>
     </div>
 
@@ -139,7 +146,7 @@
         <div class="modal-content control-panel">
             <span class="close-button" id="control-close-button">×</span>
             <h2>Control Panel</h2>
-            
+
             <div class="control-section">
                 <h3>Team Names</h3>
                 <div class="input-group">
@@ -296,4 +303,5 @@
     <audio id="game-over-sound" src="gameOverSound.mp3" preload="auto"></audio>
     <script type="module" src="script.js"></script>
 </body>
+
 </html>
