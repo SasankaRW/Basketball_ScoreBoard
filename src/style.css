@@ -73,27 +73,42 @@ body {
 }
 
 .game-clock {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+
     font-family: 'Orbitron', monospace;
     font-size: clamp(18rem, 40vh, 35rem);
-    /* Even larger */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    font-kerning: none;
+    /* stop auto spacing changes */
+
     color: #e74c3c;
-    /* Clock Red */
     background-color: #1a0505;
-    /* Dark Red BG */
     padding: 0 1.5rem;
     border-radius: 20px;
     border: 2px solid #333;
-    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(231, 76, 60, 0.2);
-    line-height: 1;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8),
+        0 0 20px rgba(231, 76, 60, 0.2);
     text-shadow: 0 0 30px rgba(231, 76, 60, 0.6);
-    letter-spacing: 3px;
-    /* Even tighter */
-    width: 4.8ch;
-    /* Fixed width for 5 characters (MM:SS) */
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    /* Use monospace numbers */
+    line-height: 1;
+    white-space: nowrap;
 }
+
+/* Each character has its own fixed-width cell */
+.clock-char {
+    display: inline-block;
+    width: 1ch;
+    /* width of one digit */
+    text-align: center;
+}
+
+/* Optional: colon a bit narrower / spaced */
+.clock-char.colon {
+    width: 0.7ch;
+}
+
 
 /* --- Logo Section --- */
 .logo-section {

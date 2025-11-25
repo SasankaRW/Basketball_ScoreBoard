@@ -104,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         quarter: 1,
         gameMinutes: 10,
         gameSeconds: 0,
+        gameMilliseconds: 0,
         shotClockSeconds: 24,
         isGameClockRunning: false,
         isShotClockRunning: false,
@@ -232,11 +233,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Firebase Setup ---
     const stateRef = ref(db, 'scoreboardState');
 
+    // Helper function to wrap each character in a fixed-width span
+    const wrapClockChars = (timeString) => {
+        return timeString.split('').map(char => {
+            const className = char === ':' ? 'clock-char colon' : 'clock-char';
+            return `<span class="${className}">${char}</span>`;
+        }).join('');
+    };
+
     // --- Update Functions ---
     const updateDisplay = () => {
         if (homeScoreEl) homeScoreEl.textContent = String(scoreboardState.homeScore).padStart(2, '0');
         if (awayScoreEl) awayScoreEl.textContent = String(scoreboardState.awayScore).padStart(2, '0');
-        if (gameClockEl) gameClockEl.textContent = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
+
+        // Display seconds:milliseconds when under 60 seconds, otherwise minutes:seconds
+        if (gameClockEl) {
+            let timeString;
+            if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) {
+                // Show seconds:centiseconds (hundredths) format
+                const centiseconds = Math.floor(scoreboardState.gameMilliseconds / 10);
+                timeString = `${String(scoreboardState.gameSeconds).padStart(2, '0')}:${String(centiseconds).padStart(2, '0')}`;
+            } else {
+                // Show minutes:seconds format
+                timeString = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
+            }
+            gameClockEl.innerHTML = wrapClockChars(timeString);
+        }
         if (shotClockEl) shotClockEl.textContent = String(scoreboardState.shotClockSeconds).padStart(2, '0');
         if (quarterEl) {
             if (scoreboardState.quarter <= 4) {
@@ -377,6 +399,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 awayTeamName: scoreboardState.awayTeamName
             };
 
+            // Preserve gameMilliseconds if not in new state (to handle updates from older clients)
+            const currentMilliseconds = scoreboardState.gameMilliseconds;
+
             // Update state
             scoreboardState = { ...scoreboardState, ...newState };
 
@@ -388,32 +413,72 @@ document.addEventListener('DOMContentLoaded', () => {
                 scoreboardState.awayTeamName = currentTeamNames.awayTeamName;
             }
 
+            // Ensure gameMilliseconds is preserved if missing and valid
+            if (!newState.hasOwnProperty('gameMilliseconds') && typeof currentMilliseconds === 'number') {
+                scoreboardState.gameMilliseconds = currentMilliseconds;
+            }
+
+            // Ensure gameMilliseconds is a number
+            if (scoreboardState.gameMilliseconds === undefined || scoreboardState.gameMilliseconds === null) {
+                scoreboardState.gameMilliseconds = 0;
+            } else {
+                scoreboardState.gameMilliseconds = Number(scoreboardState.gameMilliseconds);
+            }
+
             updateDisplay();
         }
     });
 
     // --- Timer Functions (refactored) ---
     function tickGameClock() {
-        if (scoreboardState.gameSeconds > 0) {
-            scoreboardState.gameSeconds--;
-        } else if (scoreboardState.gameMinutes > 0) {
-            scoreboardState.gameMinutes--;
-            scoreboardState.gameSeconds = 59;
-        } else {
-            stopGameClock();
-            const gameOverSound = document.getElementById('game-over-sound');
-            if (gameOverSound) {
-                gameOverSound.currentTime = 0;
-                gameOverSound.play().catch(() => {
-                    // Handle autoplay restrictions silently
-                });
+        // Ensure gameMilliseconds is a number
+        scoreboardState.gameMilliseconds = Number(scoreboardState.gameMilliseconds) || 0;
+
+        // When in last minute, track milliseconds
+        if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) {
+            if (scoreboardState.gameMilliseconds >= 100) {
+                scoreboardState.gameMilliseconds -= 100; // Subtract 100ms
+            } else if (scoreboardState.gameSeconds > 0) {
+                scoreboardState.gameSeconds--;
+                scoreboardState.gameMilliseconds = 990; // Reset to 990ms (99 centiseconds)
+            } else {
+                // Time's up
+                scoreboardState.gameMilliseconds = 0; // Ensure it's 0
+                stopGameClock();
+                const gameOverSound = document.getElementById('game-over-sound');
+                if (gameOverSound) {
+                    gameOverSound.currentTime = 0;
+                    gameOverSound.play().catch(() => {
+                        // Handle autoplay restrictions silently
+                    });
+                }
+                // Alert removed - sound plays immediately
             }
-            // Alert removed - sound plays immediately
+        } else {
+            // Normal minutes:seconds mode
+            if (scoreboardState.gameSeconds > 0) {
+                scoreboardState.gameSeconds--;
+            } else if (scoreboardState.gameMinutes > 0) {
+                scoreboardState.gameMinutes--;
+                scoreboardState.gameSeconds = 59;
+            }
+
+            // When transitioning to last minute, initialize milliseconds and switch interval
+            if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds === 59) {
+                scoreboardState.gameMilliseconds = 990;
+                // Switch to 100ms interval for millisecond precision
+                if (scoreboardState.isGameClockRunning) {
+                    clearInterval(gameTimerInterval);
+                    gameTimerInterval = setInterval(tickGameClock, 100);
+                }
+            }
         }
+
         // Only update game clock in Firebase, not the entire state
         pushStateToFirebaseEfficient({
             gameMinutes: scoreboardState.gameMinutes,
-            gameSeconds: scoreboardState.gameSeconds
+            gameSeconds: scoreboardState.gameSeconds,
+            gameMilliseconds: scoreboardState.gameMilliseconds
         });
     }
     function tickShotClock() {
@@ -442,8 +507,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function startGameClock() {
         return requireAuth(() => {
             if (!scoreboardState.isGameClockRunning && (scoreboardState.gameMinutes > 0 || scoreboardState.gameSeconds > 0)) {
+                // Initialize milliseconds if starting in the last minute and not already set
+                if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60 && scoreboardState.gameMilliseconds === 0) {
+                    scoreboardState.gameMilliseconds = 990; // Start at 99 centiseconds
+                }
+
                 clearInterval(gameTimerInterval);
-                gameTimerInterval = setInterval(tickGameClock, 1000);
+                // Use 100ms intervals when in last minute for millisecond precision
+                const interval = (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) ? 100 : 1000;
+                gameTimerInterval = setInterval(tickGameClock, interval);
                 scoreboardState.isGameClockRunning = true;
                 if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock RUNNING";
                 pushStateToFirebase();
@@ -490,6 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 scoreboardState.gameMinutes = 10;
                 scoreboardState.gameSeconds = 0;
+                scoreboardState.gameMilliseconds = 0;
                 pushStateToFirebase();
                 if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock Reset";
             }
@@ -575,6 +648,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!isNaN(mins) && !isNaN(secs) && mins >= 0 && secs >= 0 && secs < 60) {
                         scoreboardState.gameMinutes = mins;
                         scoreboardState.gameSeconds = secs;
+                        // Initialize milliseconds if in last minute
+                        scoreboardState.gameMilliseconds = (mins === 0 && secs < 60) ? 990 : 0;
                         pushStateToFirebase();
                     } else {
                         alert("Invalid time format. Please use MM:SS.");
@@ -666,6 +741,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update game clock
             if (gameMinutesInput) scoreboardState.gameMinutes = Math.max(0, Math.min(99, parseInt(gameMinutesInput.value) || 0));
             if (gameSecondsInput) scoreboardState.gameSeconds = Math.max(0, Math.min(59, parseInt(gameSecondsInput.value) || 0));
+            // Initialize milliseconds if in last minute
+            scoreboardState.gameMilliseconds = (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) ? 990 : 0;
 
             // Update shot clock
             if (shotClockInput) scoreboardState.shotClockSeconds = Math.max(0, Math.min(99, parseInt(shotClockInput.value) || 0));
@@ -709,6 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 scoreboardState.ballPossession = 'home';
                 scoreboardState.gameMinutes = scoreboardState.defaultGameMinutes;
                 scoreboardState.gameSeconds = 0;
+                scoreboardState.gameMilliseconds = 0;
                 scoreboardState.shotClockSeconds = scoreboardState.defaultShotClock;
                 scoreboardState.isGameClockRunning = false;
                 scoreboardState.isShotClockRunning = false;
@@ -735,6 +813,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ballPossession: 'home',
                     gameMinutes: scoreboardState.defaultGameMinutes,
                     gameSeconds: 0,
+                    gameMilliseconds: 0,
                     shotClockSeconds: scoreboardState.defaultShotClock,
                     isGameClockRunning: false,
                     isShotClockRunning: false,
