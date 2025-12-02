@@ -236,7 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helper function to wrap each character in a fixed-width span
     const wrapClockChars = (timeString) => {
         return timeString.split('').map(char => {
-            const className = char === ':' ? 'clock-char colon' : 'clock-char';
+            // Use 'colon' class for both ':' and '.' separators
+            const className = (char === ':' || char === '.') ? 'clock-char colon' : 'clock-char';
             return `<span class="${className}">${char}</span>`;
         }).join('');
     };
@@ -250,9 +251,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameClockEl) {
             let timeString;
             if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) {
-                // Show seconds:centiseconds (hundredths) format
-                const centiseconds = Math.floor(scoreboardState.gameMilliseconds / 10);
-                timeString = `${String(scoreboardState.gameSeconds).padStart(2, '0')}:${String(centiseconds).padStart(2, '0')}`;
+                // Show seconds.milliseconds (single digit 0-9) format with dot separator
+                const milliseconds = Math.floor(scoreboardState.gameMilliseconds / 100);
+                timeString = `${String(scoreboardState.gameSeconds).padStart(2, '0')}.${String(milliseconds)}`;
             } else {
                 // Show minutes:seconds format
                 timeString = `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
@@ -434,13 +435,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Ensure gameMilliseconds is a number
         scoreboardState.gameMilliseconds = Number(scoreboardState.gameMilliseconds) || 0;
 
-        // When in last minute, track milliseconds
+        // When in last minute, track milliseconds (single digit 0-9, each = 100ms)
         if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) {
             if (scoreboardState.gameMilliseconds >= 100) {
                 scoreboardState.gameMilliseconds -= 100; // Subtract 100ms
             } else if (scoreboardState.gameSeconds > 0) {
                 scoreboardState.gameSeconds--;
-                scoreboardState.gameMilliseconds = 990; // Reset to 990ms (99 centiseconds)
+                scoreboardState.gameMilliseconds = 900; // Reset to 900ms (9 milliseconds)
             } else {
                 // Time's up
                 scoreboardState.gameMilliseconds = 0; // Ensure it's 0
@@ -465,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // When transitioning to last minute, initialize milliseconds and switch interval
             if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds === 59) {
-                scoreboardState.gameMilliseconds = 990;
+                scoreboardState.gameMilliseconds = 900; // Start at 9 milliseconds (900ms)
                 // Switch to 100ms interval for millisecond precision
                 if (scoreboardState.isGameClockRunning) {
                     clearInterval(gameTimerInterval);
@@ -509,7 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!scoreboardState.isGameClockRunning && (scoreboardState.gameMinutes > 0 || scoreboardState.gameSeconds > 0)) {
                 // Initialize milliseconds if starting in the last minute and not already set
                 if (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60 && scoreboardState.gameMilliseconds === 0) {
-                    scoreboardState.gameMilliseconds = 990; // Start at 99 centiseconds
+                    scoreboardState.gameMilliseconds = 900; // Start at 9 milliseconds (900ms)
                 }
 
                 clearInterval(gameTimerInterval);
@@ -639,23 +640,50 @@ document.addEventListener('DOMContentLoaded', () => {
     function setCustomTime() {
         return requireAuth(() => {
             stopGameClock();
-            const timeInput = prompt("Enter game time (MM:SS):", `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`);
+            const defaultTime = scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60 
+                ? `${String(scoreboardState.gameSeconds).padStart(2, '0')}.${Math.floor(scoreboardState.gameMilliseconds / 100)}`
+                : `${String(scoreboardState.gameMinutes).padStart(2, '0')}:${String(scoreboardState.gameSeconds).padStart(2, '0')}`;
+            const timeInput = prompt("Enter game time (MM:SS for minutes:seconds or SS.M for seconds.milliseconds):", defaultTime);
             if (timeInput) {
-                const parts = timeInput.split(':');
-                if (parts.length === 2) {
-                    const mins = parseInt(parts[0], 10);
-                    const secs = parseInt(parts[1], 10);
-                    if (!isNaN(mins) && !isNaN(secs) && mins >= 0 && secs >= 0 && secs < 60) {
-                        scoreboardState.gameMinutes = mins;
-                        scoreboardState.gameSeconds = secs;
-                        // Initialize milliseconds if in last minute
-                        scoreboardState.gameMilliseconds = (mins === 0 && secs < 60) ? 990 : 0;
-                        pushStateToFirebase();
-                    } else {
-                        alert("Invalid time format. Please use MM:SS.");
+                let mins = 0;
+                let secs = 0;
+                let milliseconds = 0;
+                let isValid = false;
+
+                // Check if input contains "." (seconds.milliseconds format)
+                if (timeInput.includes('.')) {
+                    const parts = timeInput.split('.');
+                    if (parts.length === 2) {
+                        const secondsPart = parseFloat(parts[0]);
+                        const millisecondsPart = parseInt(parts[1], 10);
+                        if (!isNaN(secondsPart) && !isNaN(millisecondsPart) && secondsPart >= 0 && millisecondsPart >= 0 && millisecondsPart <= 9) {
+                            secs = Math.floor(secondsPart);
+                            milliseconds = millisecondsPart * 100; // Convert single digit (0-9) to milliseconds (0-900)
+                            isValid = true;
+                        }
                     }
+                }
+                // Check if input contains ":" (minutes:seconds format)
+                else if (timeInput.includes(':')) {
+                    const parts = timeInput.split(':');
+                    if (parts.length === 2) {
+                        mins = parseInt(parts[0], 10);
+                        secs = parseInt(parts[1], 10);
+                        if (!isNaN(mins) && !isNaN(secs) && mins >= 0 && secs >= 0 && secs < 60) {
+                            // Initialize milliseconds if in last minute
+                            milliseconds = (mins === 0 && secs < 60) ? 900 : 0;
+                            isValid = true;
+                        }
+                    }
+                }
+
+                if (isValid) {
+                    scoreboardState.gameMinutes = mins;
+                    scoreboardState.gameSeconds = secs;
+                    scoreboardState.gameMilliseconds = milliseconds;
+                    pushStateToFirebase();
                 } else {
-                    alert("Invalid time format. Please use MM:SS.");
+                    alert("Invalid time format. Use MM:SS (minutes:seconds) or SS.M (seconds.milliseconds).");
                 }
             }
             if (controlsInfoEl) controlsInfoEl.textContent = "Game Clock STOPPED";
@@ -742,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (gameMinutesInput) scoreboardState.gameMinutes = Math.max(0, Math.min(99, parseInt(gameMinutesInput.value) || 0));
             if (gameSecondsInput) scoreboardState.gameSeconds = Math.max(0, Math.min(59, parseInt(gameSecondsInput.value) || 0));
             // Initialize milliseconds if in last minute
-            scoreboardState.gameMilliseconds = (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) ? 990 : 0;
+            scoreboardState.gameMilliseconds = (scoreboardState.gameMinutes === 0 && scoreboardState.gameSeconds < 60) ? 900 : 0;
 
             // Update shot clock
             if (shotClockInput) scoreboardState.shotClockSeconds = Math.max(0, Math.min(99, parseInt(shotClockInput.value) || 0));
