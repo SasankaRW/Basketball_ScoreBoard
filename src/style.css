@@ -266,6 +266,18 @@ body.swap-layout .team-name.away .possession-arrow {
     border-color: transparent transparent transparent #ffffff;
 }
 
+body.swap-layout .fouls-section {
+    flex-direction: row-reverse;
+}
+
+body.swap-layout .fouls-section .foul-box.home {
+    order: 2;
+}
+
+body.swap-layout .fouls-section .foul-box.away {
+    order: 1;
+}
+
 /* --- Main Section (Scores & Fouls) --- */
 .main-section {
     display: flex;
