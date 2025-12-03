@@ -231,6 +231,41 @@ body {
     opacity: 1;
 }
 
+/* Swap layout helper (used by scoreboard-swapped.html) */
+body.swap-layout .names-section .team-name.away {
+    order: 1;
+}
+
+body.swap-layout .names-section .team-name.home {
+    order: 2;
+}
+
+body.swap-layout .main-section .score-container.away {
+    order: 1;
+}
+
+body.swap-layout .main-section .fouls-section {
+    order: 2;
+}
+
+body.swap-layout .main-section .score-container.home {
+    order: 3;
+}
+
+body.swap-layout .team-name.home .possession-arrow {
+    left: auto;
+    right: -40px;
+    border-width: 15px 25px 15px 0;
+    border-color: transparent #ffffff transparent transparent;
+}
+
+body.swap-layout .team-name.away .possession-arrow {
+    right: auto;
+    left: -40px;
+    border-width: 15px 0 15px 25px;
+    border-color: transparent transparent transparent #ffffff;
+}
+
 /* --- Main Section (Scores & Fouls) --- */
 .main-section {
     display: flex;
