@@ -267,7 +267,8 @@ body.swap-layout .team-name.away .possession-arrow {
 }
 
 body.swap-layout .fouls-section {
-    flex-direction: row-reverse;
+    display: flex;
+    flex-direction: row;
 }
 
 body.swap-layout .fouls-section .foul-box.home {
