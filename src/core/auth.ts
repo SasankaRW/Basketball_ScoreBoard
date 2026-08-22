@@ -107,6 +107,22 @@ export interface SignUpInput {
 }
 
 /**
+ * Creates the tenant this account owns, and the claims that grant access to
+ * it.
+ *
+ * Idempotent server-side (see src/server/tenants.ts — it claims
+ * `userIndex/{uid}` in a transaction), so calling it again for an account
+ * that already has a tenant resolves to that same tenant rather than
+ * creating a second one. That is what makes it safe to call from the
+ * recovery path in ProvisioningPage as well as from signup.
+ */
+export async function provisionTenant(organisationName: string): Promise<{ tenantId: string }> {
+  return callApi<{ tenantId: string }>('provisionTenant', {
+    organisationName: organisationName.trim(),
+  });
+}
+
+/**
  * Creates the account, then asks the backend to provision a tenant for it.
  *
  * Tenant creation is a server call rather than a client write because it has
@@ -121,9 +137,7 @@ export async function signUp(auth: Auth, input: SignUpInput): Promise<Session> {
     await updateProfile(credential.user, { displayName: input.displayName.trim() });
   }
 
-  await callApi<{ tenantId: string }>('provisionTenant', {
-    organisationName: input.organisationName.trim(),
-  });
+  await provisionTenant(input.organisationName);
 
   const session = await refreshSession(auth);
   if (!session) {
