@@ -1,0 +1,137 @@
+rules_version = '2';
+
+// Control-plane access rules.
+//
+// The identity that matters is `request.auth.token.tenantId` — a custom claim
+// written only by Cloud Functions. Nothing here reads a tenant ID out of the
+// request body, so a client that lies about which tenant it belongs to changes
+// nothing about what it can reach.
+//
+// Anything that must stay in step with an auth custom claim or a secret hash
+// (member creation, board creation, key rotation) is Functions-only. Clients get
+// narrow, field-limited update rights and nothing more.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.tenantId is string;
+    }
+
+    function inTenant(tid) {
+      return signedIn() && request.auth.token.tenantId == tid;
+    }
+
+    function hasRole(tid, roles) {
+      return inTenant(tid) && request.auth.token.role in roles;
+    }
+
+    // Only these fields may ever change, and only these.
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    match /tenants/{tid} {
+      allow get: if inTenant(tid);
+      allow list: if false;
+
+      // Provisioned by the signup Function, which also sets the owner's claims.
+      allow create, delete: if false;
+
+      allow update: if hasRole(tid, ['owner', 'admin'])
+                    && onlyChanges(['name', 'settings', 'updatedAt']);
+
+      // Membership mirrors auth custom claims. Letting a client write here would
+      // let it grant itself a role the token does not carry, so it is sealed.
+      match /members/{uid} {
+        allow read: if inTenant(tid);
+        allow write: if false;
+      }
+
+      match /boards/{bid} {
+        allow read: if inTenant(tid);
+
+        // Creation mints viewer keys; deletion must tear down live state.
+        allow create, delete: if false;
+
+        // Note the omissions: overlayKeyHash and mirrorKeyHash are absent, so a
+        // board admin cannot substitute a key hash they know the preimage of.
+        allow update: if hasRole(tid, ['owner', 'admin'])
+                      && onlyChanges(['name', 'config', 'theme', 'archived', 'updatedAt']);
+
+        // Plaintext mirror and overlay keys, so the dashboard can hand out a
+        // shareable link at any time rather than only once at creation.
+        //
+        // They live in a subcollection rather than on the board document because
+        // the board document is readable by every member: an operator needs to
+        // see that a board exists without being handed its shareable URLs. Only
+        // Functions write here, and `exchangeViewerKey` still verifies against
+        // the hash on the parent document, so this collection leaking would not
+        // by itself let anyone past the check.
+        match /secrets/{secretId} {
+          allow read: if hasRole(tid, ['owner', 'admin']);
+          allow write: if false;
+        }
+      }
+
+      // Completed games. Written only by the `finishMatch` Function, which
+      // computes every metric from the board's actual live state — a client
+      // writing here directly could fabricate a result no game ever produced.
+      match /matches/{matchId} {
+        allow read: if inTenant(tid);
+        allow write: if false;
+      }
+
+      // Planned games. Unlike boards and matches, ordinary create/edit/cancel
+      // is a plain client write — there is no secret or cross-database
+      // consequence to protect, only who's allowed to plan a game. Moving a
+      // match to 'in_progress' or 'completed' is Functions-only
+      // (startScheduledMatch / finishMatch, both using the Admin SDK, which
+      // bypasses these rules entirely) — the `in [...]` check on `update`
+      // below is what stops a client from faking either transition itself.
+      match /schedule/{scheduleId} {
+        allow read: if inTenant(tid);
+
+        allow create: if hasRole(tid, ['owner', 'admin', 'operator'])
+                      && request.resource.data.status == 'scheduled'
+                      && request.resource.data.boardId == null
+                      && request.resource.data.matchId == null;
+
+        allow update: if hasRole(tid, ['owner', 'admin', 'operator'])
+                      && resource.data.status == 'scheduled'
+                      && onlyChanges(['homeTeamName', 'awayTeamName', 'scheduledAt', 'notes', 'config', 'status', 'updatedAt'])
+                      && request.resource.data.status in ['scheduled', 'cancelled'];
+
+        allow delete: if hasRole(tid, ['owner', 'admin'])
+                      && resource.data.status in ['scheduled', 'cancelled'];
+      }
+
+      // Append-only: written by Functions, never by a client, not even to correct it.
+      match /audit/{eventId} {
+        allow read: if hasRole(tid, ['owner', 'admin']);
+        allow write: if false;
+      }
+    }
+
+    // Top level so an invitee can resolve their invite before they belong to
+    // the tenant. Reads are by exact ID only — the ID is the unguessable secret.
+    match /invites/{inviteId} {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow write: if false;
+    }
+
+    // Bootstrap lookup for the moment between signup and custom claims landing
+    // in a refreshed ID token.
+    match /userIndex/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    // Anything not matched above is denied, including future collections added
+    // without a corresponding rule.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

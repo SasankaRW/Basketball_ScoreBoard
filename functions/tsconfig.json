@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+
+    // rootDir reaches above this package so the Functions compile the *same*
+    // reducer, clock and schema the browser runs. Server-side validation and
+    // client-side behaviour cannot drift, because they are one codebase.
+    "rootDir": "..",
+    "outDir": "lib",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "../src/core/schema.ts",
+    "../src/core/clock.ts",
+    "../src/core/reducer.ts",
+    "../src/core/ids.ts",
+    "../src/core/roles.ts",
+    "../src/core/region.ts",
+    "../src/core/firebaseConfig.ts"
+  ]
+}

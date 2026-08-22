@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Board branding assets — currently just the tournament logo shown on the
+// scoreboard/mirror/overlay in place of a hardcoded default. One canonical
+// object per board; re-uploading overwrites it, so there is never more than
+// one live logo per board to reason about.
+//
+// Read is tenant/board-scoped the same way the RTDB live-state read rule is
+// (database.rules.json): any member of the owning tenant, or a mirror/overlay
+// viewer session scoped to this exact board. Note for anyone auditing this:
+// the actual <img> requests the display pages issue use Firebase's
+// download-token URL scheme, which is served independent of these rules once
+// a token has been minted — the same bearer-capability model this app
+// already uses for mirror/overlay viewer links (functions/src/viewerKeys.ts).
+// That is an accepted, existing trade-off; this read rule is defense-in-depth
+// for direct API/SDK access, not what actually gates the broadcast.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null && request.auth.token.tenantId is string;
+    }
+
+    function hasRole(tenantId, roles) {
+      return signedIn() && request.auth.token.tenantId == tenantId && request.auth.token.role in roles;
+    }
+
+    match /tenants/{tenantId}/boards/{boardId}/logo {
+      allow read: if hasRole(tenantId, ['owner', 'admin', 'operator', 'viewer'])
+                  || (signedIn()
+                      && request.auth.token.tenantId == tenantId
+                      && request.auth.token.role in ['overlay', 'mirror']
+                      && request.auth.token.boardId == boardId);
+
+      // create/update, not write: `request.resource` is null on a delete
+      // request, so a single `write` condition that references
+      // `request.resource.size` would throw — and therefore deny — every
+      // delete attempt.
+      allow create, update: if hasRole(tenantId, ['owner', 'admin'])
+                            && request.resource.size < 2 * 1024 * 1024
+                            && request.resource.contentType.matches('image/.*');
+
+      allow delete: if hasRole(tenantId, ['owner', 'admin']);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

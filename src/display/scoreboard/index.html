@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Basketball Scoreboard</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="scoreboard">
+      <!-- Home Section -->
+      <div class="team home">
+        <div class="team-name" id="home-team-name" tabindex="0">
+          HOME
+          <div class="possession-arrow" id="home-possession-arrow"></div>
+        </div>
+        <div class="score" id="home-score">00</div>
+        <div class="stats">
+          <div class="stat-line foul">
+            <span class="label">FOULS</span>
+            <span class="value" id="home-fouls">0</span>
+          </div>
+          <div class="stat-line timeout">
+            <span class="label">TIMEOUTS LEFT</span>
+            <span class="value" id="home-timeouts">2</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Section -->
+      <div class="center-console">
+        <div class="clock-container">
+          <div class="clock-label">GAME TIME</div>
+          <div class="game-clock" id="game-clock">12:00</div>
+        </div>
+        <div class="clock-container">
+          <div class="clock-label">SHOT CLOCK</div>
+          <div class="shot-clock" id="shot-clock">24</div>
+        </div>
+        <div class="quarter-display" id="quarter-display">Q1</div>
+        <img id="board-logo" class="logo" alt="Tournament logo" hidden />
+        <div class="controls-info" id="controls-info">Press 'H' for Help</div>
+      </div>
+
+      <!-- Away Section -->
+      <div class="team away">
+        <div class="team-name" id="away-team-name" tabindex="0">
+          AWAY
+          <div class="possession-arrow" id="away-possession-arrow"></div>
+        </div>
+        <div class="score" id="away-score">00</div>
+        <div class="stats">
+          <div class="stat-line foul">
+            <span class="label">FOULS</span>
+            <span class="value" id="away-fouls">0</span>
+          </div>
+          <div class="stat-line timeout">
+            <span class="label">TIMEOUTS LEFT</span>
+            <span class="value" id="away-timeouts">2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      The login and control-panel modals that used to live here are now real,
+      separately-routed pages: /login and /control/:boardId. The scoreboard
+      itself is unchanged.
+    -->
+
+    <!-- Help Modal (Hidden by default) -->
+    <div id="help-modal" class="modal">
+      <div class="modal-content">
+        <span class="close-button">×</span>
+        <h2>Keyboard Controls</h2>
+        <ul>
+          <h2>Clock</h2>
+          <li><strong>T:</strong> Start/Stop Game Clock</li>
+          <li><strong>Spacebar/Right click:</strong> Start/Stop Shot Clock</li>
+          <li><strong>G:</strong> Reset Game Clock</li>
+          <li><strong>R/Left click:</strong> Reset Shot Clock (24s)</li>
+          <hr />
+          <h2>Score</h2>
+          <li><strong>Arrow Up:</strong> Home Score +1</li>
+          <li><strong>Arrow Down:</strong> Home Score -1</li>
+          <li><strong>Arrow Right:</strong> Away Score +1</li>
+          <li><strong>Arrow Left:</strong> Away Score -1</li>
+          <hr />
+          <h2>Fouls</h2>
+          <li><strong>F:</strong> Home Fouls +1</li>
+          <li><strong>Shift + F:</strong> Home Fouls -1</li>
+          <li><strong>J:</strong> Away Fouls +1</li>
+          <li><strong>Shift + J:</strong> Away Fouls -1</li>
+          <hr />
+          <h2>Timeouts</h2>
+          <li><strong>Z:</strong> Home Timeouts -1</li>
+          <li><strong>Shift + Z:</strong> Home Timeouts +1</li>
+          <li><strong>X:</strong> Away Timeouts -1</li>
+          <li><strong>Shift + X:</strong> Away Timeouts +1</li>
+          <hr />
+          <h2>Quarter</h2>
+          <li><strong>Q:</strong> Quarter +1</li>
+          <li><strong>Shift + Q:</strong> Quarter -1</li>
+          <hr />
+          <h2>Ball Possession</h2>
+          <li><strong>B:</strong> Toggle Ball Possession</li>
+          <hr />
+          <li><strong>Shift + C:</strong> Set Custom Shot Clock (prompts for seconds)</li>
+          <li><strong>Enter:</strong> Set Custom Game Time (prompts)</li>
+          <li><strong>N:</strong> Set Custom Team Names</li>
+          <li><strong>H:</strong> Show/Hide This Help</li>
+          <li><strong>C:</strong> Open Control Panel (new tab)</li>
+          <li><strong>A / D:</strong> New Game (clears score, fouls and clocks)</li>
+        </ul>
+      </div>
+    </div>
+
+    <audio id="shotclock-sound" src="/assets/ShotClockBuzzer.mp3" preload="auto"></audio>
+    <audio id="game-over-sound" src="/assets/gameOverSound.mp3" preload="auto"></audio>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

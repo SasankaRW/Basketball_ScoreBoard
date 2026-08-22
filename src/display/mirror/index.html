@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scoreboard Mirror</title>
+    <!-- The mirror is the scoreboard with input removed, so it shares the stylesheet verbatim. -->
+    <link rel="stylesheet" href="../scoreboard/style.css" />
+  </head>
+  <body>
+    <!--
+      The block below is copied verbatim from src/display/scoreboard/index.html.
+      tests/unit/markup.test.ts asserts the two stay byte-identical, so the mirror
+      cannot silently drift away from the board it is mirroring.
+    -->
+    <div class="scoreboard">
+      <!-- Home Section -->
+      <div class="team home">
+        <div class="team-name" id="home-team-name" tabindex="0">
+          HOME
+          <div class="possession-arrow" id="home-possession-arrow"></div>
+        </div>
+        <div class="score" id="home-score">00</div>
+        <div class="stats">
+          <div class="stat-line foul">
+            <span class="label">FOULS</span>
+            <span class="value" id="home-fouls">0</span>
+          </div>
+          <div class="stat-line timeout">
+            <span class="label">TIMEOUTS LEFT</span>
+            <span class="value" id="home-timeouts">2</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Section -->
+      <div class="center-console">
+        <div class="clock-container">
+          <div class="clock-label">GAME TIME</div>
+          <div class="game-clock" id="game-clock">12:00</div>
+        </div>
+        <div class="clock-container">
+          <div class="clock-label">SHOT CLOCK</div>
+          <div class="shot-clock" id="shot-clock">24</div>
+        </div>
+        <div class="quarter-display" id="quarter-display">Q1</div>
+        <img id="board-logo" class="logo" alt="Tournament logo" hidden />
+        <div class="controls-info" id="controls-info">Press 'H' for Help</div>
+      </div>
+
+      <!-- Away Section -->
+      <div class="team away">
+        <div class="team-name" id="away-team-name" tabindex="0">
+          AWAY
+          <div class="possession-arrow" id="away-possession-arrow"></div>
+        </div>
+        <div class="score" id="away-score">00</div>
+        <div class="stats">
+          <div class="stat-line foul">
+            <span class="label">FOULS</span>
+            <span class="value" id="away-fouls">0</span>
+          </div>
+          <div class="stat-line timeout">
+            <span class="label">TIMEOUTS LEFT</span>
+            <span class="value" id="away-timeouts">2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

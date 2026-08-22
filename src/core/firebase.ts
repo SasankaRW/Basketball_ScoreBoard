@@ -1,0 +1,100 @@
+/**
+ * One Firebase app instance, shared by every page.
+ *
+ * Configuration comes from Vite env vars, falling back to the project's own
+ * config. That fallback is safe: a Firebase web config is a set of public
+ * identifiers, not credentials — the security boundary is the rules in
+ * firestore.rules and database.rules.json, not the visibility of these strings.
+ *
+ * Firestore is deliberately absent from this module — see firestoreClient.ts.
+ * The scoreboard, mirror and overlay pages never touch Firestore, only Auth,
+ * Realtime Database and Functions (for the viewer-key exchange). Because
+ * bundlers include a shared module's entire import graph in whatever chunk
+ * reaches every entry point, importing `firebase/firestore` here — one of the
+ * larger pieces of the SDK — would have shipped it to the OBS overlay on every
+ * load for a feature the overlay never calls.
+ */
+import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
+import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import { connectDatabaseEmulator, getDatabase, type Database } from 'firebase/database';
+import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
+import { DATABASE_URL, PROJECT_ID } from './firebaseConfig.js';
+import { FUNCTIONS_REGION } from './region.js';
+
+const env = import.meta.env;
+
+const DEFAULT_CONFIG: FirebaseOptions = {
+  apiKey: 'AIzaSyB0I8H2bAIFMMB01n-4p-G3ogxbmp3Nii8',
+  authDomain: 'basketballscoreboard-65c95.firebaseapp.com',
+  databaseURL: DATABASE_URL,
+  projectId: PROJECT_ID,
+  storageBucket: 'basketballscoreboard-65c95.firebasestorage.app',
+  messagingSenderId: '31697951521',
+  appId: '1:31697951521:web:074259ad89964d30437c60',
+};
+
+const firebaseConfig: FirebaseOptions = {
+  apiKey: env.VITE_FIREBASE_API_KEY ?? DEFAULT_CONFIG.apiKey,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? DEFAULT_CONFIG.authDomain,
+  databaseURL: env.VITE_FIREBASE_DATABASE_URL ?? DEFAULT_CONFIG.databaseURL,
+  projectId: env.VITE_FIREBASE_PROJECT_ID ?? DEFAULT_CONFIG.projectId,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET ?? DEFAULT_CONFIG.storageBucket,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? DEFAULT_CONFIG.messagingSenderId,
+  appId: env.VITE_FIREBASE_APP_ID ?? DEFAULT_CONFIG.appId,
+};
+
+/**
+ * Emulator ports, kept in step with the `emulators` block in firebase.json.
+ * Firestore sits on 8085 rather than the Firebase default of 8080, which Docker
+ * Desktop commonly occupies.
+ */
+export const EMULATOR_PORTS = {
+  auth: 9099,
+  database: 9000,
+  firestore: 8085,
+  storage: 9199,
+  functions: 5001,
+} as const;
+
+export const EMULATOR_HOST = '127.0.0.1';
+
+export function shouldUseEmulators(): boolean {
+  if (env.VITE_USE_EMULATORS === 'true') return true;
+  if (env.VITE_USE_EMULATORS === 'false') return false;
+  if (typeof window === 'undefined') return false;
+  const { hostname } = window.location;
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+}
+
+let cached: {
+  app: FirebaseApp;
+  auth: Auth;
+  db: Database;
+  functions: Functions;
+  usingEmulators: boolean;
+} | null = null;
+
+export function getFirebase() {
+  if (cached) return cached;
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+  // Must match the region every function in functions/src is declared with —
+  // see FUNCTIONS_REGION's own comment for why this cannot be left to default.
+  const functions = getFunctions(app, FUNCTIONS_REGION);
+  const usingEmulators = shouldUseEmulators();
+
+  if (usingEmulators) {
+    connectAuthEmulator(auth, `http://${EMULATOR_HOST}:${EMULATOR_PORTS.auth}`, {
+      disableWarnings: true,
+    });
+    connectDatabaseEmulator(db, EMULATOR_HOST, EMULATOR_PORTS.database);
+    connectFunctionsEmulator(functions, EMULATOR_HOST, EMULATOR_PORTS.functions);
+  }
+
+  cached = { app, auth, db, functions, usingEmulators };
+  return cached;
+}
+
+export const isEmulated = (): boolean => getFirebase().usingEmulators;

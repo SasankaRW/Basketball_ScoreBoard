@@ -1,0 +1,37 @@
+node_modules/
+dist/
+coverage/
+
+# Firebase
+.firebase/
+.emulator-data/
+firebase-debug.log
+firebase-debug.*.log
+database-debug.log
+firestore-debug.log
+ui-debug.log
+pubsub-debug.log
+.runtimeconfig.json
+functions/lib/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Local env — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Windows shortcut left over from the static-site era
+*.lnk
