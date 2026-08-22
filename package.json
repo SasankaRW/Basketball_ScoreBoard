@@ -9,10 +9,10 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:api": "vercel dev --listen 5000",
     "build": "tsc --noEmit && vite build",
-    "build:functions": "npm --prefix functions run build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit && npm --prefix functions run typecheck",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,css,html,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,css,html,md}\"",
@@ -21,15 +21,16 @@
     "test:unit:watch": "vitest --project unit",
     "test:integration": "firebase emulators:exec --only database \"vitest run --project integration\"",
     "test:rules": "firebase emulators:exec --only database,firestore,storage \"vitest run --project rules\"",
-    "test:e2e": "npm run build && npm run build:functions && firebase emulators:exec --only auth,database,firestore,storage,functions,hosting \"playwright test --project=e2e\"",
+    "test:e2e": "npm run build && firebase emulators:exec --only auth,database,firestore,storage \"node scripts/with-vercel-dev.mjs npx playwright test --project=e2e\"",
     "test:e2e:ui": "playwright test --project=e2e --ui",
-    "test:visual": "npm run build && npm run build:functions && firebase emulators:exec --only auth,database,firestore,storage,functions,hosting \"playwright test --project=visual\"",
-    "baseline": "npm run build && npm run build:functions && firebase emulators:exec --only auth,database,firestore,storage,functions,hosting \"playwright test --project=visual --update-snapshots\"",
-    "emulators": "firebase emulators:start --only auth,database,firestore,storage,functions,hosting --import=./.emulator-data --export-on-exit=./.emulator-data",
+    "test:visual": "npm run build && firebase emulators:exec --only auth,database,firestore,storage \"node scripts/with-vercel-dev.mjs npx playwright test --project=visual\"",
+    "baseline": "npm run build && firebase emulators:exec --only auth,database,firestore,storage \"node scripts/with-vercel-dev.mjs npx playwright test --project=visual --update-snapshots\"",
+    "emulators": "firebase emulators:start --only auth,database,firestore,storage --import=./.emulator-data --export-on-exit=./.emulator-data",
     "coverage": "vitest run --project unit --coverage"
   },
   "dependencies": {
     "firebase": "^11.10.0",
+    "firebase-admin": "^14.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.0",
@@ -42,6 +43,7 @@
     "@types/node": "^22.10.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@vercel/node": "^6.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^3.0.5",
     "eslint": "^9.18.0",
@@ -53,12 +55,18 @@
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
+    "vercel": "^59.4.0",
     "vite": "^6.0.7",
-    "vitest": "^3.0.5"
+    "vitest": "^3.0.5",
+    "wait-on": "^9.1.0"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
     "@firebase/util@1.12.1": true,
-    "protobufjs@7.6.5": true
+    "protobufjs@7.6.5": true,
+    "esbuild@0.27.0": true,
+    "esbuild@0.27.7": true,
+    "re2@1.26.1": true,
+    "@firebase/util@1.15.3": true
   }
 }

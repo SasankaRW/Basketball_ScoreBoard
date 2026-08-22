@@ -23,7 +23,7 @@ function safeNext(raw: string | null): string {
 }
 
 export function LoginPage() {
-  const { auth, functions } = getFirebase();
+  const { auth } = getFirebase();
   const { state } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,7 +56,7 @@ export function LoginPage() {
         await signIn(auth, email, password);
         navigate(next, { replace: true });
       } else {
-        await signUp(auth, functions, { email, password, displayName, organisationName });
+        await signUp(auth, { email, password, displayName, organisationName });
         navigate('/app', { replace: true });
       }
     } catch (caught) {

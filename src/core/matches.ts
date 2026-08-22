@@ -1,9 +1,9 @@
 /**
  * Match history — completed games.
  *
- * Read-only from the client's perspective plus one callable: every record is
- * computed and written by the `finishMatch` Cloud Function
- * (functions/src/matches.ts) from a board's actual live state, never
+ * Read-only from the client's perspective plus one call: every record is
+ * computed and written by the `finishMatch` server function
+ * (src/server/matches.ts) from a board's actual live state, never
  * constructed here, so a client cannot fabricate a result no game produced.
  */
 import {
@@ -15,7 +15,7 @@ import {
   query,
   type Firestore,
 } from 'firebase/firestore';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { callApi } from './api.js';
 import type { PeriodPoints } from './matchRecord.js';
 
 export interface MatchRecordDoc {
@@ -101,11 +101,6 @@ export function subscribeMatch(
   );
 }
 
-export async function finishMatch(
-  functions: Functions,
-  boardId: string,
-): Promise<{ matchId: string }> {
-  const call = httpsCallable<{ boardId: string }, { matchId: string }>(functions, 'finishMatch');
-  const { data } = await call({ boardId });
-  return data;
+export async function finishMatch(boardId: string): Promise<{ matchId: string }> {
+  return callApi<{ matchId: string }>('finishMatch', { boardId });
 }

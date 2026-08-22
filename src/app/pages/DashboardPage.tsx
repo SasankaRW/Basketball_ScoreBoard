@@ -4,7 +4,6 @@
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { createBoard } from '../../core/boards.js';
-import { getFirebase } from '../../core/firebase.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import {
   canManageBoards,
@@ -45,7 +44,6 @@ function formatTime(ms: number): string {
 
 export function DashboardPage() {
   const session = useSession();
-  const { functions } = getFirebase();
   const firestore = getFirestoreClient();
   const { boards, error: boardsError } = useBoards(session.tenantId);
 
@@ -122,22 +120,14 @@ export function DashboardPage() {
       {canManageMembers(session.role) ? <MembersSection tenantId={session.tenantId} /> : null}
       {canViewAudit(session.role) ? <AuditSection tenantId={session.tenantId} /> : null}
 
-      {showCreate ? (
-        <CreateBoardModal onClose={() => setShowCreate(false)} functions={functions} />
-      ) : null}
+      {showCreate ? <CreateBoardModal onClose={() => setShowCreate(false)} /> : null}
     </AppShell>
   );
 }
 
 // ---------------------------------------------------------------------------
 
-function CreateBoardModal({
-  onClose,
-  functions,
-}: {
-  onClose: () => void;
-  functions: ReturnType<typeof getFirebase>['functions'];
-}) {
+function CreateBoardModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('');
   const [periodMinutes, setPeriodMinutes] = useState(10);
   const [shotClockSeconds, setShotClockSeconds] = useState(24);
@@ -151,7 +141,7 @@ function CreateBoardModal({
     setBusy(true);
     setError(null);
     try {
-      const result = await createBoard(functions, {
+      const result = await createBoard({
         name,
         config: {
           periodLengthMs: periodMinutes * 60_000,
@@ -266,7 +256,6 @@ function CreateBoardModal({
 
 function MembersSection({ tenantId }: { tenantId: string }) {
   const session = useSession();
-  const { functions } = getFirebase();
   const firestore = getFirestoreClient();
   const [members, setMembers] = useState<Member[]>([]);
   const [showInvite, setShowInvite] = useState(false);
@@ -277,7 +266,7 @@ function MembersSection({ tenantId }: { tenantId: string }) {
   async function changeRole(uid: string, role: MemberRole) {
     setError(null);
     try {
-      await setMemberRole(functions, { uid, role });
+      await setMemberRole({ uid, role });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not change that role.');
     }
@@ -287,7 +276,7 @@ function MembersSection({ tenantId }: { tenantId: string }) {
     if (!confirm(`Remove ${email} from this organisation?`)) return;
     setError(null);
     try {
-      await removeMember(functions, uid);
+      await removeMember(uid);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not remove that member.');
     }
@@ -363,20 +352,12 @@ function MembersSection({ tenantId }: { tenantId: string }) {
         </table>
       </div>
 
-      {showInvite ? (
-        <InviteModal onClose={() => setShowInvite(false)} functions={functions} />
-      ) : null}
+      {showInvite ? <InviteModal onClose={() => setShowInvite(false)} /> : null}
     </section>
   );
 }
 
-function InviteModal({
-  onClose,
-  functions,
-}: {
-  onClose: () => void;
-  functions: ReturnType<typeof getFirebase>['functions'];
-}) {
+function InviteModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<MemberRole>('operator');
   const [busy, setBusy] = useState(false);
@@ -388,7 +369,7 @@ function InviteModal({
     setBusy(true);
     setError(null);
     try {
-      const result = await inviteMember(functions, { email, role });
+      const result = await inviteMember({ email, role });
       setInviteUrl(`${window.location.origin}${result.inviteUrl}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not create that invite.');

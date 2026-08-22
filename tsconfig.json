@@ -22,6 +22,6 @@
 
     "types": ["node", "vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "*.config.ts"],
-  "exclude": ["node_modules", "dist", "functions"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "api/**/*.ts", "tests/**/*.ts", "*.config.ts"],
+  "exclude": ["node_modules", "dist"]
 }

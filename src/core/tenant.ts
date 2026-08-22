@@ -18,7 +18,7 @@ import {
   where,
   type Firestore,
 } from 'firebase/firestore';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { callApi } from './api.js';
 import type { MemberRole } from './roles.js';
 
 export interface Tenant {
@@ -152,39 +152,23 @@ export async function renameTenant(
   });
 }
 
-export async function inviteMember(
-  functions: Functions,
-  input: { email: string; role: MemberRole },
-): Promise<{ inviteId: string; inviteUrl: string }> {
-  const call = httpsCallable<typeof input, { inviteId: string; inviteUrl: string }>(
-    functions,
-    'inviteMember',
-  );
-  const { data } = await call(input);
-  return data;
+export async function inviteMember(input: {
+  email: string;
+  role: MemberRole;
+}): Promise<{ inviteId: string; inviteUrl: string }> {
+  return callApi<{ inviteId: string; inviteUrl: string }>('inviteMember', input);
 }
 
 export async function acceptInvite(
-  functions: Functions,
   inviteId: string,
 ): Promise<{ tenantId: string; role: MemberRole }> {
-  const call = httpsCallable<{ inviteId: string }, { tenantId: string; role: MemberRole }>(
-    functions,
-    'acceptInvite',
-  );
-  const { data } = await call({ inviteId });
-  return data;
+  return callApi<{ tenantId: string; role: MemberRole }>('acceptInvite', { inviteId });
 }
 
-export async function setMemberRole(
-  functions: Functions,
-  input: { uid: string; role: MemberRole },
-): Promise<void> {
-  const call = httpsCallable<typeof input, { ok: boolean }>(functions, 'setMemberRole');
-  await call(input);
+export async function setMemberRole(input: { uid: string; role: MemberRole }): Promise<void> {
+  await callApi<{ ok: boolean }>('setMemberRole', input);
 }
 
-export async function removeMember(functions: Functions, uid: string): Promise<void> {
-  const call = httpsCallable<{ uid: string }, { ok: boolean }>(functions, 'removeMember');
-  await call({ uid });
+export async function removeMember(uid: string): Promise<void> {
+  await callApi<{ ok: boolean }>('removeMember', { uid });
 }

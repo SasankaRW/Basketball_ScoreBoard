@@ -7,19 +7,22 @@
  * firestore.rules and database.rules.json, not the visibility of these strings.
  *
  * Firestore is deliberately absent from this module — see firestoreClient.ts.
- * The scoreboard, mirror and overlay pages never touch Firestore, only Auth,
- * Realtime Database and Functions (for the viewer-key exchange). Because
- * bundlers include a shared module's entire import graph in whatever chunk
- * reaches every entry point, importing `firebase/firestore` here — one of the
- * larger pieces of the SDK — would have shipped it to the OBS overlay on every
- * load for a feature the overlay never calls.
+ * The scoreboard, mirror and overlay pages never touch Firestore, only Auth
+ * and Realtime Database. Because bundlers include a shared module's entire
+ * import graph in whatever chunk reaches every entry point, importing
+ * `firebase/firestore` here — one of the larger pieces of the SDK — would
+ * have shipped it to the OBS overlay on every load for a feature the overlay
+ * never calls.
+ *
+ * Privileged operations (create board, finish match, invite a member, …) go
+ * through `core/api.ts`'s `callApi()` — plain `fetch` calls to `/api/*`
+ * (Vercel serverless functions), not the Firebase Functions SDK, so there is
+ * no `functions` client here to construct.
  */
 import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 import { connectDatabaseEmulator, getDatabase, type Database } from 'firebase/database';
-import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
 import { DATABASE_URL, PROJECT_ID } from './firebaseConfig.js';
-import { FUNCTIONS_REGION } from './region.js';
 
 const env = import.meta.env;
 
@@ -53,7 +56,6 @@ export const EMULATOR_PORTS = {
   database: 9000,
   firestore: 8085,
   storage: 9199,
-  functions: 5001,
 } as const;
 
 export const EMULATOR_HOST = '127.0.0.1';
@@ -70,7 +72,6 @@ let cached: {
   app: FirebaseApp;
   auth: Auth;
   db: Database;
-  functions: Functions;
   usingEmulators: boolean;
 } | null = null;
 
@@ -80,9 +81,6 @@ export function getFirebase() {
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getDatabase(app);
-  // Must match the region every function in functions/src is declared with —
-  // see FUNCTIONS_REGION's own comment for why this cannot be left to default.
-  const functions = getFunctions(app, FUNCTIONS_REGION);
   const usingEmulators = shouldUseEmulators();
 
   if (usingEmulators) {
@@ -90,10 +88,9 @@ export function getFirebase() {
       disableWarnings: true,
     });
     connectDatabaseEmulator(db, EMULATOR_HOST, EMULATOR_PORTS.database);
-    connectFunctionsEmulator(functions, EMULATOR_HOST, EMULATOR_PORTS.functions);
   }
 
-  cached = { app, auth, db, functions, usingEmulators };
+  cached = { app, auth, db, usingEmulators };
   return cached;
 }
 

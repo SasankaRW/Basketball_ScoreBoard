@@ -7,14 +7,14 @@ import tseslint from 'typescript-eslint';
 
 /**
  * One flat config for the whole repo: the framework-free core, the React
- * console, the vanilla display pages, and the Cloud Functions all lint the
- * same way, with a couple of narrow overrides where their environments
- * genuinely differ (browser globals vs Node globals, JSX rules only where
- * JSX exists).
+ * console, the vanilla display pages, and the server-side API routes all
+ * lint the same way, with a couple of narrow overrides where their
+ * environments genuinely differ (browser globals vs Node globals, JSX rules
+ * only where JSX exists).
  */
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'functions/lib/**', 'node_modules/**', 'functions/node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**'],
   },
 
   js.configs.recommended,
@@ -37,9 +37,20 @@ export default tseslint.config(
     },
   },
 
-  // Cloud Functions: Node, not browser.
+  // Server-side: the trusted, Admin-SDK-privileged layer (src/server/) and
+  // the thin Vercel route handlers that call into it (api/). Node, not
+  // browser — this also overrides the broader `src/**` browser-globals block
+  // above for the one subtree that genuinely isn't browser code.
   {
-    files: ['functions/src/**/*.ts'],
+    files: ['src/server/**/*.ts', 'api/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+
+  // Local dev/CI scripts: plain Node, not TypeScript.
+  {
+    files: ['scripts/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node },
     },

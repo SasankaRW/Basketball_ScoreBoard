@@ -2,25 +2,23 @@
  * Match lifecycle: finishing a live game into permanent history, and starting
  * a scheduled game onto a board.
  *
- * Both are Functions rather than client writes for the same reason as
- * `createBoard`/`rotateViewerKey`: each touches something a client must not be
- * trusted to compute or enforce itself — `finishMatch` derives every metric
- * from the board's *actual* live state rather than trusting whatever a client
- * claims the score was, and `startScheduledMatch` enforces the "board must be
- * idle" rule server-side rather than relying on a UI that merely hints at it.
+ * Both need privileges a client must not hold — `finishMatch` derives every
+ * metric from the board's *actual* live state rather than trusting whatever a
+ * client claims the score was, and `startScheduledMatch` enforces the "board
+ * must be idle" rule server-side rather than relying on a UI that merely
+ * hints at it.
  */
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
-import { isValidId } from '../../src/core/ids.js';
-import { buildMatchRecord } from '../../src/core/matchRecord.js';
+import { isValidId } from '../core/ids.js';
+import { buildMatchRecord } from '../core/matchRecord.js';
 import {
   createInitialState,
   isBoardIdle,
   mergeBoardConfig,
   parseLiveBoardState,
   type BoardState,
-} from '../../src/core/schema.js';
-import { database, firestore, REGION, requireRole, writeAudit } from './common.js';
+} from '../core/schema.js';
+import { ApiError, database, firestore, writeAudit, type Caller } from './common.js';
 
 function boardsCollection(tenantId: string) {
   return firestore.collection('tenants').doc(tenantId).collection('boards');
@@ -34,20 +32,18 @@ function scheduleCollection(tenantId: string) {
 // finishMatch
 // ---------------------------------------------------------------------------
 
-const FinishMatchInput = z.object({ boardId: z.string() });
+export const FinishMatchInput = z.object({ boardId: z.string() });
 
-export const finishMatch = onCall({ region: REGION, maxInstances: 10 }, async (request) => {
-  const caller = requireRole(request, 'operator');
-
-  const parsed = FinishMatchInput.safeParse(request.data);
-  if (!parsed.success || !isValidId(parsed.data.boardId, 'brd')) {
-    throw new HttpsError('invalid-argument', 'Unknown board.');
-  }
-  const { boardId } = parsed.data;
+export async function finishMatch(
+  caller: Caller,
+  input: z.infer<typeof FinishMatchInput>,
+): Promise<{ matchId: string }> {
+  if (!isValidId(input.boardId, 'brd')) throw new ApiError(400, 'Unknown board.');
+  const { boardId } = input;
 
   const boardRef = boardsCollection(caller.tenantId).doc(boardId);
   const boardSnapshot = await boardRef.get();
-  if (!boardSnapshot.exists) throw new HttpsError('not-found', 'Board not found.');
+  if (!boardSnapshot.exists) throw new ApiError(404, 'Board not found.');
   const boardName = (boardSnapshot.data()?.['name'] as string | undefined) ?? 'Board';
 
   const now = Date.now();
@@ -72,15 +68,12 @@ export const finishMatch = onCall({ region: REGION, maxInstances: 10 }, async (r
    *
    * The `state === null` branch returns `current` rather than aborting, for
    * the same reason `dispatchAction` (core/liveState.ts) does: the Realtime
-   * Database transaction protocol — including, it turns out, the Admin SDK's
-   * implementation of it — invokes this updater with an unconfirmed local
-   * guess before it has heard from the server at all, and that guess is
-   * `null` for a path with no prior activity on this connection. Treating that
-   * as "genuinely absent" and hard-aborting would misreport a real, freshly-
-   * scored game as having nothing to finish — which is exactly the failure
-   * this comment exists to prevent a future edit from reintroducing. Returning
-   * the same value lets the SDK detect the mismatch against the real server
-   * data and rerun this function with the value that is actually trustworthy.
+   * Database transaction protocol invokes this updater with an unconfirmed
+   * local guess before it has heard from the server at all, and that guess is
+   * `null` for a path with no prior activity on this connection. Treating
+   * that as "genuinely absent" and hard-aborting would misreport a real,
+   * freshly-scored game as having nothing to finish — exactly the failure
+   * this comment exists to prevent a future edit from reintroducing.
    */
   let captured: BoardState | null = null;
   const result = await liveRef.transaction((current: unknown) => {
@@ -98,7 +91,7 @@ export const finishMatch = onCall({ region: REGION, maxInstances: 10 }, async (r
   });
 
   if (!result.committed || captured === null) {
-    throw new HttpsError('failed-precondition', 'This board has no game to finish.');
+    throw new ApiError(412, 'This board has no game to finish.');
   }
   const finalState: BoardState = captured;
 
@@ -131,43 +124,35 @@ export const finishMatch = onCall({ region: REGION, maxInstances: 10 }, async (r
   });
 
   return { matchId: matchRef.id };
-});
+}
 
 // ---------------------------------------------------------------------------
 // startScheduledMatch
 // ---------------------------------------------------------------------------
 
-const StartScheduledMatchInput = z.object({
+export const StartScheduledMatchInput = z.object({
   scheduleId: z.string().min(1).max(200),
   boardId: z.string(),
 });
 
-export const startScheduledMatch = onCall({ region: REGION, maxInstances: 10 }, async (request) => {
-  const caller = requireRole(request, 'operator');
-
-  const parsed = StartScheduledMatchInput.safeParse(request.data);
-  if (!parsed.success || !isValidId(parsed.data.boardId, 'brd')) {
-    throw new HttpsError('invalid-argument', 'Invalid scheduled match or board.');
-  }
-  const { scheduleId, boardId } = parsed.data;
+export async function startScheduledMatch(
+  caller: Caller,
+  input: z.infer<typeof StartScheduledMatchInput>,
+): Promise<{ boardId: string }> {
+  if (!isValidId(input.boardId, 'brd'))
+    throw new ApiError(400, 'Invalid scheduled match or board.');
+  const { scheduleId, boardId } = input;
 
   const scheduleRef = scheduleCollection(caller.tenantId).doc(scheduleId);
   const boardRef = boardsCollection(caller.tenantId).doc(boardId);
   const [scheduleSnapshot, boardSnapshot] = await Promise.all([scheduleRef.get(), boardRef.get()]);
 
-  if (!scheduleSnapshot.exists) {
-    throw new HttpsError('not-found', 'That scheduled match no longer exists.');
-  }
-  if (!boardSnapshot.exists) {
-    throw new HttpsError('not-found', 'That board no longer exists.');
-  }
+  if (!scheduleSnapshot.exists) throw new ApiError(404, 'That scheduled match no longer exists.');
+  if (!boardSnapshot.exists) throw new ApiError(404, 'That board no longer exists.');
 
   const schedule = scheduleSnapshot.data()!;
   if (schedule['status'] !== 'scheduled') {
-    throw new HttpsError(
-      'failed-precondition',
-      'This match has already been started, finished, or cancelled.',
-    );
+    throw new ApiError(412, 'This match has already been started, finished, or cancelled.');
   }
 
   const liveRef = database.ref(`live/${caller.tenantId}/${boardId}/state`);
@@ -177,8 +162,8 @@ export const startScheduledMatch = onCall({ region: REGION, maxInstances: 10 }, 
   // A board with no live state at all has never been played on and is
   // trivially idle; one that exists must actually satisfy isBoardIdle.
   if (currentState !== null && !isBoardIdle(currentState)) {
-    throw new HttpsError(
-      'failed-precondition',
+    throw new ApiError(
+      412,
       `Court "${(boardSnapshot.data()?.['name'] as string | undefined) ?? boardId}" already has a game in progress. Finish or reset it before starting this match.`,
     );
   }
@@ -223,4 +208,4 @@ export const startScheduledMatch = onCall({ region: REGION, maxInstances: 10 }, 
   });
 
   return { boardId };
-});
+}

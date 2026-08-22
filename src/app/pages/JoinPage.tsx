@@ -16,7 +16,7 @@ import { Alert, Spinner } from '../components/ui.js';
 export function JoinPage() {
   const { inviteId } = useParams<{ inviteId: string }>();
   const { state } = useAuth();
-  const { auth, functions } = getFirebase();
+  const { auth } = getFirebase();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,7 +26,7 @@ export function JoinPage() {
     if (state.status !== 'signed-in' && state.status !== 'provisioning') return;
 
     setBusy(true);
-    void acceptInvite(functions, inviteId)
+    void acceptInvite(inviteId)
       .then(async () => {
         // The new role arrives as a custom claim, which is only visible after the
         // ID token refreshes.
@@ -37,7 +37,7 @@ export function JoinPage() {
         setError(caught instanceof Error ? caught.message : 'This invite could not be accepted.');
       })
       .finally(() => setBusy(false));
-  }, [inviteId, state.status, functions, auth, navigate, busy, error]);
+  }, [inviteId, state.status, auth, navigate, busy, error]);
 
   if (state.status === 'loading') return <Spinner label="Loading…" />;
 

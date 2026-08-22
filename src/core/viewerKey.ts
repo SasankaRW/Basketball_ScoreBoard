@@ -8,7 +8,7 @@
  * board:
  *
  *     /overlay/brd_7x2q?k=<43-char key>
- *        -> exchangeViewerKey({ boardId, key })      (callable Function)
+ *        -> exchangeViewerKey({ boardId, key })      (POST /api/exchangeViewerKey)
  *        -> compares SHA-256(key) to the stored hash
  *        -> custom token { tenantId, boardId, role: 'overlay' }
  *        -> signInWithCustomToken
@@ -18,7 +18,7 @@
  * rotating a key invalidates the old link on the spot.
  */
 import type { Auth } from 'firebase/auth';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { ApiCallError, callApi } from './api.js';
 import { signInWithViewerToken, type Session } from './auth.js';
 import { isValidId, isValidViewerKey } from './ids.js';
 
@@ -58,13 +58,8 @@ export interface ViewerTokenResponse {
  * caller does not choose it — a mirror key cannot be used to claim the overlay
  * role or the reverse.
  */
-export async function authenticateViewer(
-  auth: Auth,
-  functions: Functions,
-  context: ViewerContext,
-): Promise<Session> {
-  const call = httpsCallable<ViewerContext, ViewerTokenResponse>(functions, 'exchangeViewerKey');
-  const { data } = await call(context);
+export async function authenticateViewer(auth: Auth, context: ViewerContext): Promise<Session> {
+  const data = await callApi<ViewerTokenResponse>('exchangeViewerKey', context);
   return signInWithViewerToken(auth, data.token);
 }
 
@@ -72,11 +67,9 @@ export type ViewerAuthFailure =
   'missing-key' | 'invalid-key' | 'rate-limited' | 'board-unavailable' | 'network';
 
 export function classifyViewerError(error: unknown): ViewerAuthFailure {
-  const code = (error as { code?: string } | null)?.code ?? '';
-  if (code.includes('permission-denied') || code.includes('unauthenticated')) return 'invalid-key';
-  if (code.includes('resource-exhausted')) return 'rate-limited';
-  if (code.includes('not-found')) return 'board-unavailable';
-  if (code.includes('unavailable') || code.includes('network')) return 'network';
+  if (!(error instanceof ApiCallError)) return 'network';
+  if (error.status === 429) return 'rate-limited';
+  if (error.status === 404) return 'board-unavailable';
   return 'invalid-key';
 }
 

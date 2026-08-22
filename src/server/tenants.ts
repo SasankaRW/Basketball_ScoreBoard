@@ -1,36 +1,32 @@
 /**
  * Tenant provisioning.
  *
- * This is the only path that creates a tenant, and it is a Function rather than
- * a client write for one reason: it has to set auth custom claims, which only
- * the Admin SDK can do. Those claims are what every security rule keys off, so
- * the moment a client could influence them the whole isolation model collapses.
+ * This is the only path that creates a tenant, and it needs privileges no
+ * client may hold: setting auth custom claims, which only the Admin SDK can
+ * do. Those claims are what every security rule keys off, so the moment a
+ * client could influence them the whole isolation model collapses.
  */
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
-import { generateTenantId, slugify } from '../../src/core/ids.js';
-import { auth, firestore, REGION, requireSignedIn, writeAudit } from './common.js';
+import { generateTenantId, slugify } from '../core/ids.js';
+import { auth, firestore, writeAudit, type SignedInCaller } from './common.js';
 
-const ProvisionInput = z.object({
+export const ProvisionInput = z.object({
   organisationName: z.string().trim().min(1).max(80),
 });
 
-export const provisionTenant = onCall({ region: REGION, maxInstances: 10 }, async (request) => {
-  const { uid, email } = requireSignedIn(request);
-
-  const parsed = ProvisionInput.safeParse(request.data);
-  if (!parsed.success) {
-    throw new HttpsError('invalid-argument', 'Organisation name must be 1–80 characters.');
-  }
-  const organisationName = parsed.data.organisationName;
-
+export async function provisionTenant(
+  caller: SignedInCaller,
+  input: z.infer<typeof ProvisionInput>,
+): Promise<{ tenantId: string }> {
+  const { uid, email } = caller;
+  const organisationName = input.organisationName;
   const indexRef = firestore.collection('userIndex').doc(uid);
 
   /**
-   * Idempotent by construction. Signup retries, a double-clicked button, and a
-   * Function retried after a transient error all resolve to the same tenant
-   * instead of leaving an orphan behind — the transaction claims `userIndex/{uid}`
-   * first, and only the winner creates anything.
+   * Idempotent by construction. Signup retries, a double-clicked button, and
+   * a request retried after a transient error all resolve to the same tenant
+   * instead of leaving an orphan behind — the transaction claims
+   * `userIndex/{uid}` first, and only the winner creates anything.
    */
   const tenantId = await firestore.runTransaction(async (tx) => {
     const existing = await tx.get(indexRef);
@@ -55,7 +51,7 @@ export const provisionTenant = onCall({ region: REGION, maxInstances: 10 }, asyn
 
     tx.set(firestore.collection('tenants').doc(newTenantId).collection('members').doc(uid), {
       email,
-      displayName: (request.auth?.token['name'] as string | undefined) ?? '',
+      displayName: typeof caller.token['name'] === 'string' ? caller.token['name'] : '',
       role: 'owner',
       status: 'active',
       createdAt: now,
@@ -78,4 +74,4 @@ export const provisionTenant = onCall({ region: REGION, maxInstances: 10 }, asyn
   });
 
   return { tenantId };
-});
+}

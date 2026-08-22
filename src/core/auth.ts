@@ -18,7 +18,7 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { callApi } from './api.js';
 import { isMachineRole, isMemberRole, type MemberRole, type Role } from './roles.js';
 
 export interface Session {
@@ -109,26 +109,21 @@ export interface SignUpInput {
 /**
  * Creates the account, then asks the backend to provision a tenant for it.
  *
- * Tenant creation is a Function rather than a client write because it has to set
- * custom claims, which only the Admin SDK can do. The forced token refresh at
- * the end is what makes the new claims visible without a page reload.
+ * Tenant creation is a server call rather than a client write because it has
+ * to set custom claims, which only the Admin SDK can do. The forced token
+ * refresh at the end is what makes the new claims visible without a page
+ * reload.
  */
-export async function signUp(
-  auth: Auth,
-  functions: Functions,
-  input: SignUpInput,
-): Promise<Session> {
+export async function signUp(auth: Auth, input: SignUpInput): Promise<Session> {
   const credential = await createUserWithEmailAndPassword(auth, input.email.trim(), input.password);
 
   if (input.displayName.trim()) {
     await updateProfile(credential.user, { displayName: input.displayName.trim() });
   }
 
-  const provision = httpsCallable<{ organisationName: string }, { tenantId: string }>(
-    functions,
-    'provisionTenant',
-  );
-  await provision({ organisationName: input.organisationName.trim() });
+  await callApi<{ tenantId: string }>('provisionTenant', {
+    organisationName: input.organisationName.trim(),
+  });
 
   const session = await refreshSession(auth);
   if (!session) {

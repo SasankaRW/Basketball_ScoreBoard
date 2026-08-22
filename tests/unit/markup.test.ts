@@ -71,9 +71,25 @@ describe('scoreboard and mirror markup', () => {
     },
   );
 
+  /**
+   * Absolute, not relative (`./main.ts`, `style.css`). These three pages are
+   * served under rewritten URLs — `/board/:id`, `/mirror/:id`,
+   * `/overlay/:id` — so a relative reference resolves against *that* path
+   * (`/board/main.ts`) rather than the file's own directory, and 404s. The
+   * production build rewrites relative paths to absolute hashed asset URLs,
+   * which is why this only ever broke under the dev server.
+   */
   it('share the stylesheet, so they cannot be styled apart', () => {
-    expect(SCOREBOARD_HTML).toContain('href="style.css"');
-    expect(MIRROR_HTML).toContain('href="../scoreboard/style.css"');
+    expect(SCOREBOARD_HTML).toContain('href="/display/scoreboard/style.css"');
+    expect(MIRROR_HTML).toContain('href="/display/scoreboard/style.css"');
+  });
+
+  it.each([
+    ['scoreboard', 'src/display/scoreboard/index.html'],
+    ['mirror', 'src/display/mirror/index.html'],
+    ['overlay', 'src/display/overlay/index.html'],
+  ])('%s references its entry script absolutely', (_name, path) => {
+    expect(read(path)).toMatch(/<script type="module" src="\/display\//);
   });
 });
 

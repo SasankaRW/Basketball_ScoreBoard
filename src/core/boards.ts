@@ -17,7 +17,7 @@ import {
   updateDoc,
   type Firestore,
 } from 'firebase/firestore';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { callApi } from './api.js';
 import { mergeBoardConfig, type BoardConfig } from './schema.js';
 
 export interface BoardTheme {
@@ -135,13 +135,11 @@ export interface CreateBoardResult {
   mirrorKey: string;
 }
 
-export async function createBoard(
-  functions: Functions,
-  input: { name: string; config?: Partial<BoardConfig> },
-): Promise<CreateBoardResult> {
-  const call = httpsCallable<typeof input, CreateBoardResult>(functions, 'createBoard');
-  const { data } = await call(input);
-  return data;
+export async function createBoard(input: {
+  name: string;
+  config?: Partial<BoardConfig>;
+}): Promise<CreateBoardResult> {
+  return callApi<CreateBoardResult>('createBoard', input);
 }
 
 export async function updateBoard(
@@ -156,26 +154,17 @@ export async function updateBoard(
   });
 }
 
-export async function deleteBoard(functions: Functions, boardId: string): Promise<void> {
-  const call = httpsCallable<{ boardId: string }, { deleted: boolean }>(functions, 'deleteBoard');
-  await call({ boardId });
+export async function deleteBoard(boardId: string): Promise<void> {
+  await callApi<{ deleted: boolean }>('deleteBoard', { boardId });
 }
 
 /**
  * Issues a fresh key and invalidates the old one immediately — the revocation
  * path for a leaked overlay URL.
  */
-export async function rotateViewerKey(
-  functions: Functions,
-  boardId: string,
-  kind: ViewerKeyKind,
-): Promise<string> {
-  const call = httpsCallable<{ boardId: string; kind: ViewerKeyKind }, { key: string }>(
-    functions,
-    'rotateViewerKey',
-  );
-  const { data } = await call({ boardId, kind });
-  return data.key;
+export async function rotateViewerKey(boardId: string, kind: ViewerKeyKind): Promise<string> {
+  const { key } = await callApi<{ key: string }>('rotateViewerKey', { boardId, kind });
+  return key;
 }
 
 // ---------------------------------------------------------------------------

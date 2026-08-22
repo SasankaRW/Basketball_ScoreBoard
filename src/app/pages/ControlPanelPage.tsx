@@ -13,7 +13,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { formatGameClock, formatShotClock, remainingAt } from '../../core/clock.js';
 import { buildScoreboardUrl, updateBoard, type Board } from '../../core/boards.js';
-import { getFirebase } from '../../core/firebase.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { finishMatch } from '../../core/matches.js';
 import { canControlBoard, canManageBoards } from '../../core/roles.js';
@@ -29,7 +28,6 @@ import { useBoard, useBoardState, useDispatch, useNow } from '../hooks.js';
 export function ControlPanelPage() {
   const session = useSession();
   const navigate = useNavigate();
-  const { functions } = getFirebase();
   const { boardId } = useParams<{ boardId: string }>();
   const board = useBoard(session.tenantId, boardId);
   const { state, loaded, error } = useBoardState(session.tenantId, boardId);
@@ -79,7 +77,7 @@ export function ControlPanelPage() {
     setFinishing(true);
     setFinishError(null);
     try {
-      await finishMatch(functions, boardId);
+      await finishMatch(boardId);
       setFinishResult(summary);
     } catch (caught) {
       setFinishError(caught instanceof Error ? caught.message : 'Could not finish this match.');

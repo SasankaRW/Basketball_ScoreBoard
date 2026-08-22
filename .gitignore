@@ -35,3 +35,6 @@ Thumbs.db
 
 # Windows shortcut left over from the static-site era
 *.lnk
+
+.vercel
+.env*

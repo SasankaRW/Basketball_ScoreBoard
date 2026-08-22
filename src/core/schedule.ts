@@ -5,9 +5,9 @@
  * Create / edit / cancel are plain rules-governed Firestore writes (see the
  * `schedule` match block in firestore.rules) — there is no secret or
  * cross-database consequence to protect, only who may plan a game. Starting
- * one onto a board is a callable Function (`startScheduledMatch`) because it
- * must read and validate the target board's live state, which a client
- * cannot be trusted to do honestly — see functions/src/matches.ts.
+ * one onto a board is a server call (`startScheduledMatch`) because it must
+ * read and validate the target board's live state, which a client cannot be
+ * trusted to do honestly — see src/server/matches.ts.
  */
 import {
   addDoc,
@@ -21,7 +21,7 @@ import {
   updateDoc,
   type Firestore,
 } from 'firebase/firestore';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { callApi } from './api.js';
 import { LIMITS, type BoardConfig } from './schema.js';
 
 export type ScheduleStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -157,11 +157,9 @@ export async function deleteScheduleEntry(
   await deleteDoc(doc(firestore, 'tenants', tenantId, 'schedule', scheduleId));
 }
 
-export async function startScheduledMatch(
-  functions: Functions,
-  input: { scheduleId: string; boardId: string },
-): Promise<{ boardId: string }> {
-  const call = httpsCallable<typeof input, { boardId: string }>(functions, 'startScheduledMatch');
-  const { data } = await call(input);
-  return data;
+export async function startScheduledMatch(input: {
+  scheduleId: string;
+  boardId: string;
+}): Promise<{ boardId: string }> {
+  return callApi<{ boardId: string }>('startScheduledMatch', input);
 }

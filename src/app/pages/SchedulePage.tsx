@@ -9,7 +9,6 @@
  */
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getFirebase } from '../../core/firebase.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { isBoardIdle } from '../../core/schema.js';
 import { canControlBoard, canManageBoards } from '../../core/roles.js';
@@ -494,7 +493,6 @@ function StartMatchModal({
   onClose: () => void;
   onStarted: (boardId: string) => void;
 }) {
-  const { functions } = getFirebase();
   const { boards } = useBoards(tenantId);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -507,7 +505,7 @@ function StartMatchModal({
     setBusy(true);
     setError(null);
     try {
-      const result = await startScheduledMatch(functions, {
+      const result = await startScheduledMatch({
         scheduleId: entry.id,
         boardId: selectedBoardId,
       });

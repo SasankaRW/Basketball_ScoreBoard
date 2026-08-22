@@ -42,14 +42,14 @@ export function readBoardIdFromPath(pathname = window.location.pathname): string
  * Boots a mirror or overlay from its URL key. Never prompts for a login.
  */
 export async function bootViewerSurface(): Promise<DisplayContext> {
-  const { auth, db, functions } = getFirebase();
+  const { auth, db } = getFirebase();
 
   const context = readViewerContext();
   if (!context) throw new DisplayBootError(VIEWER_ERROR_MESSAGES['missing-key']);
 
   let session: Session;
   try {
-    session = await authenticateViewer(auth, functions, context);
+    session = await authenticateViewer(auth, context);
   } catch (error) {
     throw new DisplayBootError(VIEWER_ERROR_MESSAGES[classifyViewerError(error)]);
   }

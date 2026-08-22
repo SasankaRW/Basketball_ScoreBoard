@@ -13,7 +13,6 @@ import {
   type ViewerKeyKind,
   type ViewerKeys,
 } from '../../core/boards.js';
-import { getFirebase } from '../../core/firebase.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { canManageBoards } from '../../core/roles.js';
 import { BoardConfigSchema, type BoardConfig } from '../../core/schema.js';
@@ -27,7 +26,6 @@ export function BoardSettingsPage() {
   const session = useSession();
   const navigate = useNavigate();
   const { boardId } = useParams<{ boardId: string }>();
-  const { functions } = getFirebase();
   const firestore = getFirestoreClient();
   const board = useBoard(session.tenantId, boardId);
 
@@ -102,7 +100,7 @@ export function BoardSettingsPage() {
     }
     setError(null);
     try {
-      await rotateViewerKey(functions, boardId, kind);
+      await rotateViewerKey(boardId, kind);
       setNotice(`The ${kind} link has been rotated. Copy the new URL below.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not rotate that key.');
@@ -123,7 +121,7 @@ export function BoardSettingsPage() {
     if (!boardId) return;
     setDeleting(true);
     try {
-      await deleteBoard(functions, boardId);
+      await deleteBoard(boardId);
       navigate('/app', { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not delete that board.');
