@@ -36,6 +36,43 @@ import { atLeast, isMemberRole, type MemberRole } from '../core/roles.js';
 const usingEmulators = Boolean(
   process.env['FIRESTORE_EMULATOR_HOST'] || process.env['FIREBASE_AUTH_EMULATOR_HOST'],
 );
+
+/**
+ * Parses `FIREBASE_SERVICE_ACCOUNT` with a legible failure.
+ *
+ * A malformed value here is a *configuration* mistake — most often pasting
+ * one field out of the downloaded key file rather than the whole JSON
+ * object — but it surfaces at module load, so a bare `JSON.parse` throws a
+ * `SyntaxError` that kills the entire function before any handler runs. The
+ * client then sees an opaque 500 with nothing to act on, and the real cause
+ * is only visible by digging through platform logs. Naming the problem
+ * costs one try/catch and turns that into a message that says what to fix.
+ */
+function parseServiceAccount(raw: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      'FIREBASE_SERVICE_ACCOUNT is not valid JSON. It must be the entire contents of the ' +
+        'service account key file downloaded from the Firebase console (a JSON object ' +
+        'starting with "{"), not a single field from it.',
+    );
+  }
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT must be a JSON object.');
+  }
+  const account = parsed as Record<string, unknown>;
+  for (const field of ['project_id', 'client_email', 'private_key'] as const) {
+    if (typeof account[field] !== 'string') {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT is missing "${field}". Paste the whole downloaded key file.`,
+      );
+    }
+  }
+  return account;
+}
+
 if (getApps().length === 0) {
   const serviceAccountJson = process.env['FIREBASE_SERVICE_ACCOUNT'];
   // `credential` is omitted entirely rather than passed as `undefined` when
@@ -45,7 +82,7 @@ if (getApps().length === 0) {
   // Credential interface."
   initializeApp({
     ...(!usingEmulators && serviceAccountJson
-      ? { credential: cert(JSON.parse(serviceAccountJson)) }
+      ? { credential: cert(parseServiceAccount(serviceAccountJson)) }
       : {}),
     databaseURL: DATABASE_URL,
     projectId: PROJECT_ID,
