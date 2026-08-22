@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "installCommand": "npm install --include=dev",
   "rewrites": [
     { "source": "/board/:id*", "destination": "/display/scoreboard/index.html" },
     { "source": "/mirror/:id*", "destination": "/display/mirror/index.html" },
