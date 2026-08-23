@@ -9,14 +9,21 @@
  * The buttons are deliberately oversized. This gets driven courtside, at speed,
  * by someone whose attention is mostly on the court.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { createBuzzerElements, createBuzzers } from '../../core/buzzer.js';
 import { formatGameClock, formatShotClock, remainingAt } from '../../core/clock.js';
 import { buildScoreboardUrl, updateBoard, type Board } from '../../core/boards.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { finishMatch } from '../../core/matches.js';
 import { canControlBoard, canManageBoards } from '../../core/roles.js';
-import { isInBonus, LIMITS, type BoardState, type Side } from '../../core/schema.js';
+import {
+  isInBonus,
+  LIMITS,
+  type BoardConfig,
+  type BoardState,
+  type Side,
+} from '../../core/schema.js';
 import {
   LOGO_UPLOAD_ENABLED,
   removeBoardLogo,
@@ -90,6 +97,55 @@ export function ControlPanelPage() {
       setFinishing(false);
     }
   }
+
+  /**
+   * Buzzers here as well as on the scoreboard.
+   *
+   * The operator is looking at *this* screen, not the gym-wall display, so a
+   * buzzer only the scoreboard can sound is one the person who needs it may
+   * never hear — the board is often in another room, or muted, or on a machine
+   * whose audio nobody checked. Both surfaces detecting expiry independently is
+   * already how the clocks work (see the render loop in
+   * display/scoreboard/main.ts); this just gives the sound the same treatment.
+   *
+   * Unlocking is a non-issue on this page in practice — an operator cannot use
+   * the control panel without clicking it — but it costs one listener to be
+   * certain.
+   */
+  const buzzers = useMemo(() => createBuzzers(createBuzzerElements()), []);
+
+  useEffect(() => {
+    const unlock = () => buzzers.unlock();
+    for (const eventName of ['pointerdown', 'keydown'] as const) {
+      document.addEventListener(eventName, unlock);
+    }
+    return () => {
+      for (const eventName of ['pointerdown', 'keydown'] as const) {
+        document.removeEventListener(eventName, unlock);
+      }
+    };
+  }, [buzzers]);
+
+  /**
+   * Edge-triggered on a *running* clock reaching zero, mirroring the
+   * scoreboard's `gameWasRunning`/`shotWasRunning` latches. Refs rather than
+   * state: this must not itself cause a render, and the previous value has to
+   * survive the many renders the tick already causes.
+   */
+  const gameWasRunning = useRef(false);
+  const shotWasRunning = useRef(false);
+
+  useEffect(() => {
+    if (!state) return;
+    const gameRemaining = remainingAt(state.gameClock, now);
+    const shotRemaining = remainingAt(state.shotClock, now);
+
+    if (gameWasRunning.current && gameRemaining === 0) buzzers.play('gameOver');
+    if (shotWasRunning.current && shotRemaining === 0) buzzers.play('shotClock');
+
+    gameWasRunning.current = state.gameClock.running && gameRemaining > 0;
+    shotWasRunning.current = state.shotClock.running && shotRemaining > 0;
+  }, [state, now, buzzers]);
 
   // Keyboard parity with the scoreboard, so muscle memory carries between the
   // two surfaces. Suppressed while a text field has focus.
@@ -249,6 +305,7 @@ export function ControlPanelPage() {
           <aside className="stack">
             <GameActions
               state={state}
+              boardConfig={board.config}
               disabled={readOnly}
               onAction={dispatch}
               onFinish={() => void handleFinish()}
@@ -540,12 +597,23 @@ function ClockConsole({
 
 function GameActions({
   state,
+  boardConfig,
   disabled,
   onAction,
   onFinish,
   finishing,
 }: {
   state: BoardState;
+  /**
+   * The board's *current* settings, straight from its Firestore document.
+   *
+   * Live state carries its own copy of the config, snapshotted when the board
+   * was created, and nothing refreshes it in place. Handing the fresh document
+   * to NEW_GAME is what makes an edit in Board settings actually take effect —
+   * without it, the settings page's promise that changes "apply the next time
+   * this board starts a new game" is never kept.
+   */
+  boardConfig: BoardConfig;
   disabled: boolean;
   onAction: Dispatch;
   onFinish: () => void;
@@ -592,7 +660,7 @@ function GameActions({
               'Start a new game without saving history? Score, fouls and clocks will all be cleared and this game will NOT appear in match history. Use "Finish match" instead if you want to keep a record of it.',
             )
           ) {
-            onAction({ type: 'NEW_GAME' });
+            onAction({ type: 'NEW_GAME', config: boardConfig });
           }
         }}
       >

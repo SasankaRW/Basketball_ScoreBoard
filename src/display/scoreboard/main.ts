@@ -12,6 +12,7 @@
  * Every clamp and rule lives in core/reducer.ts, which the control panel and the
  * Cloud Functions run too, so the three cannot disagree about what a foul does.
  */
+import { createBuzzers } from '../../core/buzzer.js';
 import { remainingAt } from '../../core/clock.js';
 import { dispatchWithRetry, subscribeBoardState } from '../../core/liveState.js';
 import type { Action } from '../../core/reducer.js';
@@ -97,16 +98,20 @@ async function main(): Promise<void> {
 
   // -- Buzzers ------------------------------------------------------------
 
-  const shotBuzzer = document.getElementById('shotclock-sound') as HTMLAudioElement | null;
-  const gameBuzzer = document.getElementById('game-over-sound') as HTMLAudioElement | null;
+  const buzzers = createBuzzers({
+    shotClock: document.getElementById('shotclock-sound') as HTMLAudioElement | null,
+    gameOver: document.getElementById('game-over-sound') as HTMLAudioElement | null,
+  });
 
-  function play(audio: HTMLAudioElement | null): void {
-    if (!audio) return;
-    audio.currentTime = 0;
-    // Autoplay policy rejects until the page has been interacted with; a silent
-    // failure is correct here, not an error the operator has to dismiss.
-    void audio.play().catch(() => undefined);
+  // This page is a *passive* display — the operator usually drives from the
+  // control panel on another screen — so it can run a whole game without being
+  // clicked once, which is exactly the case browsers refuse to play audio in.
+  // Take any gesture we do get.
+  for (const eventName of ['pointerdown', 'keydown'] as const) {
+    document.addEventListener(eventName, () => buzzers.unlock());
   }
+
+  buzzers.onBlocked(() => hint('Click the scoreboard once to enable the buzzer', 8_000));
 
   let gameWasRunning = false;
   let shotWasRunning = false;
@@ -128,12 +133,12 @@ async function main(): Promise<void> {
      * overlay stop rendering a countdown the database still thinks is live.
      */
     if (gameWasRunning && gameRemaining === 0) {
-      play(gameBuzzer);
+      buzzers.play('gameOver');
       hint('Period over', 5_000);
       dispatch({ type: 'SETTLE' });
     }
     if (shotWasRunning && shotRemaining === 0) {
-      play(shotBuzzer);
+      buzzers.play('shotClock');
       dispatch({ type: 'SETTLE' });
     }
 
@@ -329,19 +334,6 @@ async function main(): Promise<void> {
     const away = prompt('Enter Away Team Name:', state.away.name);
     if (away !== null) dispatch({ type: 'TEAM_NAME_SET', side: 'away', name: away });
   }
-
-  // Browsers block audio until the page has been interacted with; priming the
-  // elements on the first gesture means the buzzer is ready before it is needed.
-  const primeAudio = () => {
-    for (const audio of [shotBuzzer, gameBuzzer]) {
-      if (audio) {
-        audio.volume = audio === gameBuzzer ? 0.7 : 0.8;
-        audio.load();
-      }
-    }
-  };
-  document.addEventListener('click', primeAudio, { once: true });
-  document.addEventListener('keydown', primeAudio, { once: true });
 
   if (readOnly) hint('Read-only access — you can watch but not control this board', 8_000);
 }

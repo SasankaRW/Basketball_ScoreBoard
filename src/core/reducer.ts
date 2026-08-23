@@ -65,7 +65,7 @@ export type Action =
   | { type: 'SHOT_CLOCK_RESET'; remainingMs?: number }
   // Whole-board
   | { type: 'CONFIG_SET'; patch: Partial<BoardConfig> }
-  | { type: 'NEW_GAME' }
+  | { type: 'NEW_GAME'; config?: BoardConfig }
   | { type: 'SETTLE' };
 
 export type ActionType = Action['type'];
@@ -345,7 +345,15 @@ function compute(state: BoardState, action: Action, ctx: ActionContext): BoardSt
      * board's tournament logo — a discard-and-restart is not a rebrand.
      */
     case 'NEW_GAME': {
-      const fresh = createInitialState(state.config, ctx.now, ctx.actor, null, state.logoUrl);
+      // A caller that has the board's Firestore document to hand passes its
+      // config here, which is the only way a settings change ever reaches a
+      // live board: the config inside live state is a snapshot taken when the
+      // board was created, and nothing refreshes it on its own. Falls back to
+      // the existing snapshot when omitted or unparseable — a malformed config
+      // document must not be able to block starting a game.
+      const parsed = action.config ? BoardConfigSchema.safeParse(action.config) : null;
+      const config = parsed?.success ? parsed.data : state.config;
+      const fresh = createInitialState(config, ctx.now, ctx.actor, null, state.logoUrl);
       return { ...fresh, rev: state.rev };
     }
 

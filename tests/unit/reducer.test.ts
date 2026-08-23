@@ -385,6 +385,33 @@ describe('NEW_GAME', () => {
     expect(fresh.scheduleId).toBeNull();
   });
 
+  /**
+   * The bug this guards: board settings live in Firestore, while live state
+   * carries a snapshot of them taken at board creation. Nothing refreshes
+   * that snapshot in place, so unless NEW_GAME is handed the current config,
+   * editing (say) the shot clock in Board settings changes nothing a player
+   * ever sees — which is exactly what shipped.
+   */
+  it('adopts the board config it is handed, so settings edits actually apply', () => {
+    const updated = { ...DEFAULT_CONFIG, shotClockMs: 20_000, periodLengthMs: 8 * 60_000 };
+    const fresh = applyAction(state, { type: 'NEW_GAME', config: updated }, ctx);
+
+    expect(fresh.config.shotClockMs).toBe(20_000);
+    expect(fresh.shotClock.remainingMs).toBe(20_000);
+    expect(fresh.gameClock.remainingMs).toBe(8 * 60_000);
+  });
+
+  it('keeps the existing config when handed none', () => {
+    const fresh = applyAction(state, { type: 'NEW_GAME' }, ctx);
+    expect(fresh.config).toEqual(state.config);
+  });
+
+  it('falls back to the existing config rather than failing on a malformed one', () => {
+    const broken = { ...DEFAULT_CONFIG, shotClockMs: -5 } as unknown as typeof DEFAULT_CONFIG;
+    const fresh = applyAction(state, { type: 'NEW_GAME', config: broken }, ctx);
+    expect(fresh.config).toEqual(state.config);
+  });
+
   it('preserves the tournament logo — a discard-and-restart is not a rebrand', () => {
     const midGame: BoardState = {
       ...applyAction(state, { type: 'SCORE_ADJUST', side: 'home', delta: 10 }, ctx),
