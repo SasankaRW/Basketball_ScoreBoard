@@ -75,13 +75,41 @@ function syncTimeline(
   const target = ref(db, eventsPath(tenantId, boardId));
 
   if (action.type === 'NEW_GAME') {
-    void remove(target).catch(() => undefined);
+    void remove(target).catch(reportTimelineFailure);
     return;
   }
 
   const event = describeEvent(action, after, ctx);
   if (event === null) return;
-  void push(target, event).catch(() => undefined);
+  void push(target, event).catch(reportTimelineFailure);
+}
+
+/**
+ * Reports a timeline write that failed, once per page load.
+ *
+ * Swallowing these entirely is what a nice-to-have log deserves when the
+ * failure is transient — a dropped connection, a rejected retry — and it is why
+ * this never disturbs the operator. But the same silence hides a *permanent*
+ * failure: if `database.rules.json` has not been deployed, the `events` node is
+ * undeclared, every append is denied, and the symptom is an empty play-by-play
+ * on a game that otherwise ran perfectly, with nothing anywhere saying why.
+ * That cost a real debugging session, so the error now reaches the console.
+ *
+ * Console only, and only once: an operator courtside can do nothing about it
+ * mid-game, and a per-action warning during a fast scoring run would bury
+ * whatever else is in the log.
+ */
+let timelineFailureReported = false;
+
+function reportTimelineFailure(error: unknown): void {
+  if (timelineFailureReported) return;
+  timelineFailureReported = true;
+  console.warn(
+    'Timeline events are not being recorded; the game itself is unaffected. ' +
+      'If this says PERMISSION_DENIED, deploy the database rules: ' +
+      'npx firebase deploy --only database',
+    error,
+  );
 }
 
 /**
