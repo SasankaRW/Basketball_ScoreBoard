@@ -17,7 +17,7 @@
  * to already have a tenant resolves to that same tenant instead of getting a
  * second one.
  */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { getFirebase } from '../../core/firebase.js';
 import { provisionTenant, waitForClaims } from '../../core/auth.js';
 import { useAuth } from '../AuthProvider.js';
@@ -31,9 +31,25 @@ export function ProvisioningPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Polls exactly once per mount, deliberately with an empty dependency list.
+   *
+   * Listing `retryProvisioning` here (the obvious thing, and what this did
+   * originally) re-runs the poll every time its identity changes — and since
+   * polling force-refreshes the token, which fires `onIdTokenChanged`, which
+   * sets state in AuthProvider, that identity changed on every single poll.
+   * The result was an unbounded refresh loop that ran until Firebase started
+   * returning `auth/quota-exceeded`. The callback is stable now (AuthProvider
+   * memoises it on `auth` alone), so this list would be safe either way; it
+   * stays empty because "check once when this screen opens" is genuinely the
+   * intent, and that should not depend on a callback's identity staying
+   * stable forever.
+   */
+  const pollRef = useRef(retryProvisioning);
+  pollRef.current = retryProvisioning;
   useEffect(() => {
     let cancelled = false;
-    void retryProvisioning().then(() => {
+    void pollRef.current().then(() => {
       // If claims had arrived, AuthProvider would already have re-rendered
       // this component away. Still being mounted means the wait genuinely
       // timed out.
@@ -42,7 +58,7 @@ export function ProvisioningPage() {
     return () => {
       cancelled = true;
     };
-  }, [retryProvisioning]);
+  }, []);
 
   async function finishSetup(event: FormEvent) {
     event.preventDefault();

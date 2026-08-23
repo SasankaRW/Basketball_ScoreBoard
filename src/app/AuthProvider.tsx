@@ -5,7 +5,15 @@
  * made by an admin, or claims landing at the end of signup, propagates through
  * the UI without a reload.
  */
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { getFirebase } from '../core/firebase.js';
 import { signOutSession, subscribeAuth, waitForClaims, type AuthState } from '../core/auth.js';
 import { startServerTimeSync } from '../core/serverTime.js';
@@ -34,15 +42,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [auth, db]);
 
+  /**
+   * Deliberately keyed on `auth` alone, never on `state`.
+   *
+   * This polls by *force-refreshing* the ID token, and a force refresh fires
+   * `onIdTokenChanged`, which calls `setState` above. If this callback's
+   * identity also changed whenever `state` changed, any caller holding it in
+   * an effect's dependency array would re-run that effect on every refresh —
+   * refresh → state change → new callback → effect re-runs → refresh, forever.
+   * That loop is not theoretical: it ran in production against an account
+   * whose claims never arrive (provisioning half-failed), and hammered
+   * Firebase's token endpoint until it returned `auth/quota-exceeded`.
+   */
+  const retryProvisioning = useCallback(async () => {
+    await waitForClaims(auth);
+  }, [auth]);
+
+  const signOut = useCallback(() => signOutSession(auth), [auth]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({
-      state,
-      signOut: () => signOutSession(auth),
-      retryProvisioning: async () => {
-        await waitForClaims(auth);
-      },
-    }),
-    [state, auth],
+    () => ({ state, signOut, retryProvisioning }),
+    [state, signOut, retryProvisioning],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

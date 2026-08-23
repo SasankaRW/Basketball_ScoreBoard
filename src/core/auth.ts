@@ -163,12 +163,26 @@ export async function refreshSession(auth: Auth): Promise<Session | null> {
  */
 export async function waitForClaims(
   auth: Auth,
-  { attempts = 8, delayMs = 750 } = {},
+  { attempts = 5, delayMs = 750 } = {},
 ): Promise<Session | null> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const session = await refreshSession(auth);
-    if (session) return session;
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
+      const session = await refreshSession(auth);
+      if (session) return session;
+    } catch (error) {
+      // Each attempt *forces* a token refresh, and Firebase rate-limits that
+      // endpoint hard. Once it starts refusing, every further attempt is both
+      // guaranteed to fail and actively making the rate limit worse, so stop
+      // rather than spend the remaining attempts digging deeper. Anything
+      // else (offline, a transient 5xx) is worth another try.
+      const code = (error as { code?: string } | null)?.code ?? '';
+      if (code.includes('quota-exceeded') || code.includes('too-many-requests')) return null;
+    }
+    // Backs off rather than retrying at a fixed interval, for the same reason:
+    // claims that have not landed in 750ms are usually not landing in the next
+    // 750ms either, and a flat interval spends the whole budget inside the
+    // first few seconds.
+    await new Promise((resolve) => setTimeout(resolve, delayMs * 2 ** attempt));
   }
   return null;
 }
