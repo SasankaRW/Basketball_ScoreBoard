@@ -92,11 +92,12 @@ export function buildMatchRecord(state: BoardState, ctx: MatchRecordContext): Ma
     awayScore: state.away.score,
     homeFouls: state.home.fouls,
     awayFouls: state.away.fouls,
-    // Clamped rather than left negative: an operator can add timeouts back
-    // beyond the configured starting count via the control panel's +/- pair,
-    // and "used" has no sensible negative reading.
-    homeTimeoutsUsed: Math.max(0, state.config.timeouts - state.home.timeouts),
-    awayTimeoutsUsed: Math.max(0, state.config.timeouts - state.away.timeouts),
+    // Read straight off the running tally rather than derived from what is
+    // left. Timeouts refill at every half boundary, so `config.timeouts -
+    // timeouts` describes only the half in progress and would report a team
+    // that used two in each half as having used two.
+    homeTimeoutsUsed: state.home.timeoutsUsed,
+    awayTimeoutsUsed: state.away.timeoutsUsed,
     periodsPlayed: periods.length,
     periodScores,
     startedAt: state.matchStartedAt,

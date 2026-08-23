@@ -200,6 +200,33 @@ describe('write validation', () => {
     await assertFails(write({ ...validState({ rev: 2 }), possession: 'referee' }));
   });
 
+  describe('timeoutsUsed', () => {
+    it('accepts the running tally', async () => {
+      const base = validState({ rev: 2 });
+      await assertSucceeds(write({ ...base, home: { ...base.home, timeoutsUsed: 4 } }));
+    });
+
+    /**
+     * A game already in progress when the field shipped has teams stored
+     * without it. Requiring it would fail that board's next write and take the
+     * board down mid-game, so it is deliberately absent from `hasChildren` —
+     * `parseLiveBoardState` supplies the zero instead.
+     */
+    it('accepts a team that predates the field', async () => {
+      const base = validState({ rev: 2 });
+      const home = { ...base.home } as Record<string, unknown>;
+      delete home['timeoutsUsed'];
+      await assertSucceeds(write({ ...base, home }));
+    });
+
+    it('rejects an out-of-range or non-numeric tally', async () => {
+      const base = validState({ rev: 2 });
+      await assertFails(write({ ...base, home: { ...base.home, timeoutsUsed: 100 } }));
+      await assertFails(write({ ...base, home: { ...base.home, timeoutsUsed: -1 } }));
+      await assertFails(write({ ...base, home: { ...base.home, timeoutsUsed: 'two' } }));
+    });
+  });
+
   /**
    * The deadline clock's core invariant, enforced server-side: a clock is running
    * if and only if it carries a deadline. Without this a client could store

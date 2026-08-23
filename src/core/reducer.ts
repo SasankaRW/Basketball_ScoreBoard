@@ -25,6 +25,7 @@ import {
   createInitialState,
   LIMITS,
   otherSide,
+  startsNewHalf,
   type BoardConfig,
   type BoardState,
   type Side,
@@ -123,8 +124,30 @@ function commit(base: BoardState, next: BoardState, ctx: ActionContext): BoardSt
 
 function teamsEqual(a: TeamState, b: TeamState): boolean {
   return (
-    a.name === b.name && a.score === b.score && a.fouls === b.fouls && a.timeouts === b.timeouts
+    a.name === b.name &&
+    a.score === b.score &&
+    a.fouls === b.fouls &&
+    a.timeouts === b.timeouts &&
+    a.timeoutsUsed === b.timeoutsUsed
   );
+}
+
+/**
+ * Moves a team's timeouts to `next`, tallying any drop as timeouts taken.
+ *
+ * The tally is driven by the *actual* movement rather than by the requested
+ * delta, because `clamp` may absorb some or all of it — pressing "use timeout"
+ * on a team that has none left must not record one as spent. Handing them back
+ * after a miscount likewise decrements nothing: the count is of timeouts taken,
+ * and an operator correcting themselves did not take one.
+ */
+function withTimeouts(team: TeamState, next: number): Partial<TeamState> {
+  const clamped = clamp(next, LIMITS.timeouts.min, LIMITS.timeouts.max);
+  const taken = Math.max(0, team.timeouts - clamped);
+  return {
+    timeouts: clamped,
+    timeoutsUsed: clamp(team.timeoutsUsed + taken, LIMITS.timeouts.min, LIMITS.timeouts.max),
+  };
 }
 
 /** Returns `null` when the patch is a no-op, so the caller can skip committing. */
@@ -203,18 +226,14 @@ function compute(state: BoardState, action: Action, ctx: ActionContext): BoardSt
 
     // -- Timeouts -----------------------------------------------------------
     case 'TIMEOUT_ADJUST':
-      return patchTeam(state, action.side, {
-        timeouts: clamp(
-          state[action.side].timeouts + action.delta,
-          LIMITS.timeouts.min,
-          LIMITS.timeouts.max,
-        ),
-      });
+      return patchTeam(
+        state,
+        action.side,
+        withTimeouts(state[action.side], state[action.side].timeouts + action.delta),
+      );
 
     case 'TIMEOUT_SET':
-      return patchTeam(state, action.side, {
-        timeouts: clamp(action.value, LIMITS.timeouts.min, LIMITS.timeouts.max),
-      });
+      return patchTeam(state, action.side, withTimeouts(state[action.side], action.value));
 
     // -- Identity -----------------------------------------------------------
     case 'TEAM_NAME_SET': {
@@ -239,11 +258,20 @@ function compute(state: BoardState, action: Action, ctx: ActionContext): BoardSt
 
     /**
      * Advances to the next period the way the rulebook does: team fouls reset,
-     * both clocks return to full and paused. Kept separate from PERIOD_ADJUST so
-     * the bare `Q` shortcut retains its original nudge-only behaviour.
+     * both clocks return to full and paused, and — when the new period opens a
+     * half — each team's timeouts are granted afresh. Kept separate from
+     * PERIOD_ADJUST so the bare `Q` shortcut retains its original nudge-only
+     * behaviour, and so a mis-click corrected with `Shift+Q` does not hand out
+     * a second allocation of timeouts.
      */
     case 'NEXT_PERIOD': {
       const period = clamp(state.period + 1, LIMITS.period.min, LIMITS.period.max);
+      // `timeoutsUsed` deliberately survives the refill: it counts the match,
+      // not the half, and is what the history record reports.
+      const refill = startsNewHalf(period, state.config.startingPeriod)
+        ? { timeouts: state.config.timeouts }
+        : null;
+
       return {
         ...state,
         period,
@@ -254,8 +282,8 @@ function compute(state: BoardState, action: Action, ctx: ActionContext): BoardSt
           ...state.periodScores,
           [String(state.period)]: { home: state.home.score, away: state.away.score },
         },
-        home: { ...state.home, fouls: 0 },
-        away: { ...state.away, fouls: 0 },
+        home: { ...state.home, fouls: 0, ...refill },
+        away: { ...state.away, fouls: 0, ...refill },
         gameClock: clock.createClock(state.config.periodLengthMs),
         shotClock: clock.createClock(state.config.shotClockMs),
       };

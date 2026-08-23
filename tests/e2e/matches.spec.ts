@@ -81,6 +81,20 @@ test('a played game produces a play-by-play in history', async ({ page }) => {
   await createBoard(page, 'Court 1');
   await page.getByRole('link', { name: 'Control panel' }).click();
 
+  // Run the game clock before scoring. This is not incidental: a running clock
+  // stores a deadline and leaves its `remainingMs` field frozen at the value it
+  // started from, so an event recorded off that raw field claims to have
+  // happened at the top of the period. Every event below is therefore captured
+  // against a clock that has actually moved.
+  const gameClock = page.locator('.clock-console__game');
+  const fullPeriod = await gameClock.textContent();
+  await page
+    .locator('.clock-console .button-grid')
+    .first()
+    .getByRole('button', { name: 'Start' })
+    .click();
+  await expect(gameClock).not.toHaveText(fullPeriod!);
+
   // Play a first quarter: a basket each way, a foul, and a timeout.
   const scoreButtons = page.locator('.score-buttons .btn');
   await scoreButtons.nth(1).click(); // home +2
@@ -110,13 +124,29 @@ test('a played game produces a play-by-play in history', async ({ page }) => {
   await expect(page.locator('.timeline__period-label')).toHaveText(['Q1', 'Q2']);
 
   await expect(page.locator('.timeline__what')).toHaveText([
-    'HOME +2',
-    'AWAY +3',
-    'Foul on HOME',
-    'Timeout — AWAY',
+    '+2',
+    '+3',
+    'Foul',
+    'Timeout',
     'Start of Q2',
-    'HOME +1',
+    '+1',
   ]);
+
+  // Which team is carried by the column an entry lands in, so that is what has
+  // to be asserted — a flat list of descriptions would pass even if every event
+  // were attributed to the wrong side.
+  await expect(page.locator('.timeline__row--home .timeline__what')).toHaveText([
+    '+2',
+    'Foul',
+    '+1',
+  ]);
+  await expect(page.locator('.timeline__row--away .timeline__what')).toHaveText(['+3', 'Timeout']);
+
+  // The clock each event was stamped with must be the clock as it actually
+  // read, not the value it held when the period started.
+  await expect(page.locator('.timeline__clock').first()).not.toHaveText(fullPeriod!);
+  await expect(page.locator('.timeline__row--home .timeline__team').first()).toHaveText('HOME');
+  await expect(page.locator('.timeline__row--away .timeline__team').first()).toHaveText('AWAY');
 
   // The running score is what makes it a story rather than a list; it must be
   // the score *after* each event, not the final one repeated.

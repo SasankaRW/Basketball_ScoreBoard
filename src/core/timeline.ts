@@ -10,6 +10,7 @@
  * makes "which actions are worth recording" one tested decision in one place
  * rather than a condition scattered across the surfaces that dispatch them.
  */
+import { remainingAt } from './clock.js';
 import type { Action } from './reducer.js';
 import type { BoardState, Side } from './schema.js';
 
@@ -56,7 +57,13 @@ export function describeEvent(
   const base = {
     ts: ctx.now,
     period: after.period,
-    clockMs: after.gameClock.remainingMs,
+    // `remainingAt`, never `gameClock.remainingMs` directly. The clock stores a
+    // deadline, not a countdown (see clock.ts): while it runs, `remainingMs`
+    // holds whatever it read at the moment it was *started* and does not move
+    // again until the clock is paused. Reading it raw stamped every event of a
+    // running period with the full period length — a timeline where twenty
+    // baskets all happened at 10:00.
+    clockMs: remainingAt(after.gameClock, ctx.now),
     home: after.home.score,
     away: after.away.score,
     actor: ctx.actor,

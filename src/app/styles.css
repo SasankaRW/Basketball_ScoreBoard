@@ -1239,16 +1239,69 @@ textarea:focus {
   color: var(--text-faint);
 }
 
-/* ---------------------------------------------------------------- timeline */
+/* ---------------------------------------------------------------- timeline
+ *
+ * Head-to-head, like a printed box score: home events left of the running
+ * score, away events right of it. Position answers "which team" before a word
+ * is read; the team colour (home blue, away orange) and the name repeat it, so
+ * losing any one cue still leaves two. The previous flat list gave all three
+ * jobs to the same sentence and made every line a small reading task.
+ *
+ * The two team colours are set once here and inherited by the dot, the icon,
+ * the name, and the half of the score that moved.
+ */
 
+.timeline {
+  --home: var(--blue);
+  --away: var(--orange);
+}
+
+.timeline__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
 .timeline__title {
-  margin: 0 0 var(--space-3);
+  margin: 0;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-faint);
 }
+/* Names the colours once, so a reader never has to infer the mapping from the
+   rows themselves. */
+.timeline__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.timeline__legend-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.timeline__legend-team::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.timeline__legend-team--home {
+  color: var(--home);
+}
+.timeline__legend-team--away {
+  color: var(--away);
+}
+
 .timeline__empty {
   margin: 0;
   font-size: 0.85rem;
@@ -1262,7 +1315,7 @@ textarea:focus {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--blue);
+  color: var(--text-muted);
   margin-bottom: var(--space-2);
 }
 .timeline__list {
@@ -1273,9 +1326,10 @@ textarea:focus {
      of rows read as elapsed time rather than as a table. */
   border-left: 1px solid var(--border);
 }
+
 .timeline__row {
   display: grid;
-  grid-template-columns: 3.5rem 1.25rem 1fr auto;
+  grid-template-columns: 3.5rem 1fr auto 1fr;
   align-items: center;
   gap: var(--space-3);
   padding: 0.3rem 0 0.3rem var(--space-4);
@@ -1291,53 +1345,145 @@ textarea:focus {
   border-radius: 50%;
   background: var(--border-strong);
 }
-.timeline__row--score::before {
-  background: var(--blue);
+.timeline__row--home::before {
+  background: var(--home);
 }
+.timeline__row--away::before {
+  background: var(--away);
+}
+.timeline__row--home {
+  --team: var(--home);
+}
+.timeline__row--away {
+  --team: var(--away);
+}
+
 .timeline__clock {
   font-family: 'Orbitron', monospace;
   font-size: 0.75rem;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+.timeline__cell {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+/* Mirrored so both teams' entries hug the score in the middle: the home side
+   reads outward from the centre, the away side inward. */
+.timeline__cell--home {
+  flex-direction: row-reverse;
+}
+.timeline__cell--full {
+  grid-column: 2 / 4;
+  justify-content: center;
+}
+
 .timeline__icon {
   display: inline-flex;
-  color: var(--text-muted);
-}
-.timeline__row--score .timeline__icon {
-  color: var(--blue);
+  flex: 0 0 auto;
+  color: var(--team, var(--text-faint));
 }
 .timeline__row--foul .timeline__icon {
   color: var(--yellow);
 }
-.timeline__what {
+.timeline__row--timeout .timeline__icon,
+.timeline__row--period .timeline__icon {
+  color: var(--text-faint);
+}
+
+.timeline__team {
+  flex: 0 1 auto;
   min-width: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--team, var(--text-faint));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.timeline__row--score .timeline__what {
-  font-weight: 600;
-}
-.timeline__score {
-  font-family: 'Orbitron', monospace;
-  font-size: 0.8rem;
+
+.timeline__what {
+  flex: 0 0 auto;
+  white-space: nowrap;
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
+}
+/* A basket is the thing the eye is hunting for, so it is the only entry set at
+   full strength — fouls and timeouts stay legible without competing. */
+.timeline__row--score .timeline__what {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.timeline__row--period .timeline__what {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-@media (max-width: 560px) {
+.timeline__score {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Only the half that just moved is lit, which turns the column into a record of
+   who was scoring rather than a number to be compared against the row above. */
+.timeline__score-half--moved {
+  font-weight: 700;
+}
+.timeline__score-half--moved.timeline__score-half--home {
+  color: var(--home);
+}
+.timeline__score-half--moved.timeline__score-half--away {
+  color: var(--away);
+}
+
+/* A period boundary belongs to the game, not to either team, so it reads as a
+   rule across the row rather than as another entry in a column. */
+.timeline__row--period {
+  margin: var(--space-2) 0;
+  color: var(--text-faint);
+}
+.timeline__row--period .timeline__cell--full::before,
+.timeline__row--period .timeline__cell--full::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--border);
+}
+
+@media (max-width: 640px) {
   .match-card__score {
     font-size: 1.3rem;
   }
+  /* Columns collapse to one: the mirrored layout needs width to read as two
+     sides, and below that the colour and name carry the attribution alone. */
   .timeline__row {
-    grid-template-columns: 3rem 1.25rem 1fr;
-    row-gap: 0;
+    grid-template-columns: 3rem 1fr auto;
   }
-  /* The running score drops under the description rather than squeezing the
-     description into an ellipsis on a narrow phone. */
+  .timeline__cell--home,
+  .timeline__cell--away,
+  .timeline__cell--full {
+    grid-column: 2;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+  .timeline__cell:empty {
+    display: none;
+  }
   .timeline__score {
     grid-column: 3;
+  }
+  .timeline__row--period .timeline__cell--full::before {
+    display: none;
   }
 }
 

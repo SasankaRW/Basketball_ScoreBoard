@@ -231,7 +231,10 @@ export function BoardSettingsPage() {
                 }
               />
             </Field>
-            <Field label="Timeouts per team">
+            <Field
+              label="Timeouts per half"
+              hint="Each team gets this many per half. They refill automatically at the start of every second period — Q3, and each overtime."
+            >
               <input
                 type="number"
                 min={0}

@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { formatGameClock } from '../../core/clock.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { subscribeMatches, type MatchRecordDoc } from '../../core/matches.js';
+import type { Side } from '../../core/schema.js';
 import { subscribeTenant, type Tenant } from '../../core/tenant.js';
 import type { TimelineEvent } from '../../core/timeline.js';
 import { useSession } from '../AuthProvider.js';
@@ -241,28 +242,57 @@ const TIMELINE_ICONS = {
 } as const;
 
 /**
- * Puts one event into words.
+ * Says what happened, without naming the team.
+ *
+ * The team is carried by the *column* the row lands in, so repeating it in the
+ * text would be the third time the same fact is stated in one row. What is left
+ * is the part that differs line to line, which is what makes a column scannable.
  *
  * The sign of `delta` carries meaning that must not be normalised away: a
  * negative score delta is an operator correcting a miscount, and a *positive*
  * timeout delta is one being handed back. Saying "Timeout" for both would
  * describe the opposite of what happened half the time.
  */
-function describe(event: TimelineEvent, homeName: string, awayName: string): string {
-  const team = event.side === 'home' ? homeName : event.side === 'away' ? awayName : '';
-
+function describe(event: TimelineEvent): string {
   switch (event.type) {
     case 'score':
-      return event.delta >= 0 ? `${team} +${event.delta}` : `${team} ${event.delta} (correction)`;
+      return event.delta >= 0 ? `+${event.delta}` : `−${Math.abs(event.delta)} (correction)`;
     case 'foul':
-      return event.delta >= 0 ? `Foul on ${team}` : `Foul removed — ${team}`;
+      return event.delta >= 0 ? 'Foul' : 'Foul removed';
     case 'timeout':
-      return event.delta <= 0 ? `Timeout — ${team}` : `Timeout returned — ${team}`;
+      return event.delta <= 0 ? 'Timeout' : 'Timeout returned';
     case 'period':
       return `Start of ${periodLabel(event.period)}`;
   }
 }
 
+/** The icon, team name and description that fill one side of a row. */
+function Entry({ event, teamName }: { event: TimelineEvent; teamName: string }) {
+  const Icon = TIMELINE_ICONS[event.type];
+  return (
+    <>
+      <span className="timeline__icon">
+        <Icon size={14} />
+      </span>
+      <span className="timeline__team">{teamName}</span>
+      <span className="timeline__what">{describe(event)}</span>
+    </>
+  );
+}
+
+/**
+ * The play-by-play, laid out head-to-head.
+ *
+ * Home events sit left of the running score and away events right of it, the
+ * way a printed box score reads, so *who* is answered by position before a word
+ * is read — the team name and colour then confirm it rather than carrying it
+ * alone. A single flat list, which is what this was, forces every line to be
+ * read in full to work out which team it belongs to.
+ *
+ * Period changes break the pattern deliberately: they belong to the game rather
+ * than to either team, so they span the row as a divider and mark the score
+ * each period ended on.
+ */
 function Timeline({ match }: { match: MatchRecordDoc }) {
   // Grouped in one pass rather than filtered once per period, and memoised
   // because a long game is a few hundred events and this reruns on every
@@ -279,7 +309,19 @@ function Timeline({ match }: { match: MatchRecordDoc }) {
 
   return (
     <section className="timeline">
-      <h4 className="timeline__title">Play-by-play</h4>
+      <div className="timeline__head">
+        <h4 className="timeline__title">Play-by-play</h4>
+        {match.events.length > 0 ? (
+          <div className="timeline__legend">
+            <span className="timeline__legend-team timeline__legend-team--home">
+              {match.homeTeamName}
+            </span>
+            <span className="timeline__legend-team timeline__legend-team--away">
+              {match.awayTeamName}
+            </span>
+          </div>
+        ) : null}
+      </div>
 
       {match.events.length === 0 ? (
         <p className="timeline__empty">
@@ -291,23 +333,43 @@ function Timeline({ match }: { match: MatchRecordDoc }) {
             <div className="timeline__period" key={`${group.period}-${index}`}>
               <div className="timeline__period-label">{periodLabel(group.period)}</div>
               <ol className="timeline__list">
-                {group.events.map((event, i) => {
-                  const Icon = TIMELINE_ICONS[event.type];
-                  return (
-                    <li className={`timeline__row timeline__row--${event.type}`} key={i}>
-                      <span className="timeline__clock">{formatGameClock(event.clockMs)}</span>
-                      <span className="timeline__icon">
-                        <Icon size={14} />
+                {group.events.map((event, i) => (
+                  <li
+                    className={`timeline__row timeline__row--${event.type} timeline__row--${event.side ?? 'game'}`}
+                    key={i}
+                  >
+                    <span className="timeline__clock">{formatGameClock(event.clockMs)}</span>
+
+                    {event.side === null ? (
+                      <span className="timeline__cell timeline__cell--full">
+                        <Entry event={event} teamName="" />
                       </span>
-                      <span className="timeline__what">
-                        {describe(event, match.homeTeamName, match.awayTeamName)}
-                      </span>
-                      <span className="timeline__score">
-                        {event.home}–{event.away}
-                      </span>
-                    </li>
-                  );
-                })}
+                    ) : (
+                      <>
+                        <span className="timeline__cell timeline__cell--home">
+                          {event.side === 'home' ? (
+                            <Entry event={event} teamName={match.homeTeamName} />
+                          ) : null}
+                        </span>
+                        <span className="timeline__cell timeline__cell--away">
+                          {event.side === 'away' ? (
+                            <Entry event={event} teamName={match.awayTeamName} />
+                          ) : null}
+                        </span>
+                      </>
+                    )}
+
+                    {/*
+                      Kept on one line: `tests/e2e/matches.spec.ts` asserts the
+                      text is exactly "2–0", and JSX joins elements split across
+                      lines with a space.
+                    */}
+                    <span className="timeline__score">
+                      <span className={scoreHalfClass(event, 'home')}>{event.home}</span>–
+                      <span className={scoreHalfClass(event, 'away')}>{event.away}</span>
+                    </span>
+                  </li>
+                ))}
               </ol>
             </div>
           ))}
@@ -322,4 +384,10 @@ function Timeline({ match }: { match: MatchRecordDoc }) {
       )}
     </section>
   );
+}
+
+/** Highlights the half of the running score that this event actually moved. */
+function scoreHalfClass(event: TimelineEvent, side: Side): string {
+  const moved = event.type === 'score' && event.side === side;
+  return `timeline__score-half${moved ? ` timeline__score-half--moved timeline__score-half--${side}` : ''}`;
 }

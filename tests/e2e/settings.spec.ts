@@ -37,6 +37,66 @@ test('a saved shot-clock length reaches the control panel', async ({ page }) => 
   await expect(page.locator('.clock-console__shot')).toHaveText('20', { timeout: 10_000 });
 });
 
+/**
+ * Timeouts are allocated per half and refill at every half boundary.
+ *
+ * The reducer's arithmetic is covered by unit tests; what only this level can
+ * show is that the number an admin types survives the trip through Firestore
+ * into live state, and that a refill triggered from the control panel is
+ * actually accepted by the database — a write the security rules see for the
+ * first time here.
+ */
+test('timeouts are allocated per half and refill at the break', async ({ page }) => {
+  await signUp(page, freshAccount('timeouts'));
+  await createBoard(page, 'Court 1');
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await page.getByLabel('Timeouts per half').fill('3');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText(/Saved\./)).toBeVisible({ timeout: 10_000 });
+
+  // A new allowance does not retroactively hand timeouts to a game already
+  // under way, so it lands with the next new game — the settings page's stated
+  // promise, and the path this exercises.
+  await page.getByRole('link', { name: 'Control panel' }).click();
+  const homeTimeouts = page.locator('.team-panel').first().locator('.stat-row__value').last();
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'New game (discard, no history)' }).click();
+  await expect(homeTimeouts).toHaveText('3', { timeout: 10_000 });
+
+  // Spend two of the three.
+  await page.getByRole('button', { name: 'Use home timeout' }).click();
+  await page.getByRole('button', { name: 'Use home timeout' }).click();
+  await expect(homeTimeouts).toHaveText('1');
+
+  // Q1 → Q2 is still the first half: what is left must carry over.
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Start next period' }).click();
+  await expect(page.locator('.clock-console__period')).toHaveText('Q2');
+  await expect(homeTimeouts).toHaveText('1');
+
+  // Q2 → Q3 opens the second half, so the allowance comes back.
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Start next period' }).click();
+  await expect(page.locator('.clock-console__period')).toHaveText('Q3');
+  await expect(homeTimeouts).toHaveText('3');
+
+  // The match record still reports all three, not just the one taken after the
+  // break — the whole reason a separate tally exists.
+  await page.getByRole('button', { name: 'Use home timeout' }).click();
+  await expect(homeTimeouts).toHaveText('2');
+
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Finish match' }).click();
+  await expect(page.getByRole('heading', { name: 'Match finished' })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await page.goto('/app/history');
+  await page.getByRole('button', { name: /Box score/ }).click();
+  await expect(page.locator('.stat').filter({ hasText: 'Timeouts used' })).toContainText('3–0');
+});
+
 test('the tenths-of-a-second display setting takes effect without a new game', async ({ page }) => {
   await signUp(page, freshAccount('tenths'));
   await createBoard(page, 'Court 1');

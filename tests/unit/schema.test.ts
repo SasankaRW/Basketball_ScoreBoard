@@ -183,6 +183,31 @@ describe('parseLiveBoardState', () => {
     });
   });
 
+  /**
+   * Same failure mode as the periodScores array, guarded the same way: a board
+   * mid-game when `timeoutsUsed` shipped has teams stored without it, and a
+   * board that fails to parse reads as absent — blank display, refused writes.
+   */
+  it('defaults timeoutsUsed on a team written before the field existed', () => {
+    const raw = JSON.parse(JSON.stringify(createInitialState())) as Record<string, unknown>;
+    delete (raw['home'] as Record<string, unknown>)['timeoutsUsed'];
+    delete (raw['away'] as Record<string, unknown>)['timeoutsUsed'];
+
+    const parsed = parseLiveBoardState(raw);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.home.timeoutsUsed).toBe(0);
+    expect(parsed?.away.timeoutsUsed).toBe(0);
+  });
+
+  it('leaves an existing timeoutsUsed alone', () => {
+    const original: BoardState = {
+      ...createInitialState(),
+      home: { ...createInitialState().home, timeoutsUsed: 3 },
+    };
+    const raw = JSON.parse(JSON.stringify(original)) as Record<string, unknown>;
+    expect(parseLiveBoardState(raw)?.home.timeoutsUsed).toBe(3);
+  });
+
   it('drops holes rather than turning them into null-valued periods', () => {
     // A game whose second period was never snapshotted — sparse in, sparse out.
     const raw = JSON.parse(JSON.stringify(createInitialState())) as Record<string, unknown>;
@@ -233,8 +258,22 @@ describe('migrateLegacyState', () => {
 
   it('carries every field across to the nested shape', () => {
     const state = migrateLegacyState(legacy);
-    expect(state.home).toEqual({ name: 'Lakers', score: 64, fouls: 7, timeouts: 1 });
-    expect(state.away).toEqual({ name: 'Celtics', score: 58, fouls: 3, timeouts: 2 });
+    // timeoutsUsed starts at zero: the legacy scoreboard stored only what was
+    // left, so how many had already been taken is not recoverable.
+    expect(state.home).toEqual({
+      name: 'Lakers',
+      score: 64,
+      fouls: 7,
+      timeouts: 1,
+      timeoutsUsed: 0,
+    });
+    expect(state.away).toEqual({
+      name: 'Celtics',
+      score: 58,
+      fouls: 3,
+      timeouts: 2,
+      timeoutsUsed: 0,
+    });
     expect(state.period).toBe(3);
     expect(state.possession).toBe('away');
     expect(state.gameClock.remainingMs).toBe(4 * 60_000 + 32_000);

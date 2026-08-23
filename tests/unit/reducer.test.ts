@@ -228,6 +228,101 @@ describe('period', () => {
   });
 });
 
+/**
+ * Timeouts are allocated per *half*, so the count both refills and has to keep
+ * being countable across the refill. Those are two separate obligations and the
+ * tests below hold them apart: `timeouts` is what a team has left right now,
+ * `timeoutsUsed` is what the match record reports at the end.
+ */
+describe('timeouts per half', () => {
+  const use = (side: 'home' | 'away'): Action => ({ type: 'TIMEOUT_ADJUST', side, delta: -1 });
+
+  it('starts each team with the configured allowance', () => {
+    expect(state.home.timeouts).toBe(DEFAULT_CONFIG.timeouts);
+    expect(state.home.timeoutsUsed).toBe(0);
+  });
+
+  it('counts a timeout as taken and as one fewer remaining', () => {
+    const next = applyAction(state, use('home'), ctx);
+    expect(next.home.timeouts).toBe(DEFAULT_CONFIG.timeouts - 1);
+    expect(next.home.timeoutsUsed).toBe(1);
+  });
+
+  it('refills at the start of the second half, without forgetting the first', () => {
+    const firstHalf = applyActions(state, [use('home'), use('home'), { type: 'NEXT_PERIOD' }], ctx);
+    // Q2 is still the first half — no refill yet.
+    expect(firstHalf.home.timeouts).toBe(DEFAULT_CONFIG.timeouts - 2);
+
+    const secondHalf = applyAction(firstHalf, { type: 'NEXT_PERIOD' }, ctx);
+    expect(secondHalf.period).toBe(3);
+    expect(secondHalf.home.timeouts).toBe(DEFAULT_CONFIG.timeouts);
+    expect(secondHalf.away.timeouts).toBe(DEFAULT_CONFIG.timeouts);
+    // The whole point of the separate tally: the two taken before the break
+    // are still on the record.
+    expect(secondHalf.home.timeoutsUsed).toBe(2);
+  });
+
+  it('accumulates across halves', () => {
+    const played = applyActions(
+      state,
+      [use('home'), { type: 'NEXT_PERIOD' }, { type: 'NEXT_PERIOD' }, use('home'), use('home')],
+      ctx,
+    );
+    expect(played.home.timeouts).toBe(DEFAULT_CONFIG.timeouts - 2);
+    expect(played.home.timeoutsUsed).toBe(3);
+  });
+
+  it('gives each overtime its own allocation', () => {
+    let played = state;
+    for (let i = 0; i < 4; i += 1) played = applyAction(played, { type: 'NEXT_PERIOD' }, ctx);
+    expect(played.period).toBe(5); // OT1
+    expect(played.home.timeouts).toBe(DEFAULT_CONFIG.timeouts);
+  });
+
+  /**
+   * PERIOD_ADJUST is the correction tool — `Q` / `Shift+Q`. Refilling on it
+   * would hand out a fresh allocation every time an operator nudged the period
+   * back and forth to fix a mis-click.
+   */
+  it('does not refill on a manual period nudge', () => {
+    const used = applyActions(state, [use('home'), use('home')], ctx);
+    const nudged = applyActions(used, [{ type: 'PERIOD_ADJUST', delta: 1 }], ctx);
+    const toThird = applyAction(nudged, { type: 'PERIOD_ADJUST', delta: 1 }, ctx);
+
+    expect(toThird.period).toBe(3);
+    expect(toThird.home.timeouts).toBe(DEFAULT_CONFIG.timeouts - 2);
+  });
+
+  it('records nothing as taken when a team has none left', () => {
+    const spent = applyActions(state, Array(DEFAULT_CONFIG.timeouts).fill(use('home')), ctx);
+    expect(spent.home.timeouts).toBe(0);
+
+    const again = applyAction(spent, use('home'), ctx);
+    // The clamp absorbed it, so no timeout was actually taken — and a no-op
+    // must stay a no-op, or every blocked press would burn a revision.
+    expect(again).toBe(spent);
+    expect(again.home.timeoutsUsed).toBe(DEFAULT_CONFIG.timeouts);
+  });
+
+  /**
+   * An operator handing a timeout back after a miscount did not take one, so
+   * the tally must not run backwards — otherwise "used" could be talked down to
+   * zero on a team that used three.
+   */
+  it('does not un-count a timeout that is handed back', () => {
+    const used = applyAction(state, use('home'), ctx);
+    const restored = applyAction(used, { type: 'TIMEOUT_ADJUST', side: 'home', delta: 1 }, ctx);
+
+    expect(restored.home.timeouts).toBe(DEFAULT_CONFIG.timeouts);
+    expect(restored.home.timeoutsUsed).toBe(1);
+  });
+
+  it('clears the tally on a new game', () => {
+    const used = applyAction(state, use('home'), ctx);
+    expect(applyAction(used, { type: 'NEW_GAME' }, ctx).home.timeoutsUsed).toBe(0);
+  });
+});
+
 describe('possession', () => {
   it('toggles between sides', () => {
     const away = applyAction(state, { type: 'POSSESSION_TOGGLE' }, ctx);

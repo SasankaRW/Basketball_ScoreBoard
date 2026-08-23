@@ -69,6 +69,45 @@ describe('describeEvent — what belongs on a timeline', () => {
     const event = record({ type: 'NEXT_PERIOD' });
     expect(event?.period).toBe(state.period + 1);
   });
+
+  /**
+   * The regression test for a timeline where every event of a period claimed to
+   * have happened at 10:00.
+   *
+   * A running clock stores a *deadline*; its `remainingMs` field is frozen at
+   * whatever it held when the clock was started and does not move again until
+   * it is paused. Every assertion above uses a stopped clock, where the two
+   * happen to agree — which is exactly why they all passed while the shipped
+   * feature was wrong. These two use a running one, where they do not.
+   */
+  it('reports the clock as it actually reads while it is running', () => {
+    const running = applyAction(state, { type: 'GAME_CLOCK_START' }, ctx);
+    const twoMinutesLater = { now: T0 + 120_000, actor: 'uid_operator' };
+
+    const action: Action = { type: 'SCORE_ADJUST', side: 'home', delta: 2 };
+    const event = describeEvent(
+      action,
+      applyAction(running, action, twoMinutesLater),
+      twoMinutesLater,
+    );
+
+    expect(event?.clockMs).toBe(running.gameClock.remainingMs - 120_000);
+  });
+
+  it('reports a stopped clock at the value it is stopped on', () => {
+    const paused = applyAction(
+      applyAction(state, { type: 'GAME_CLOCK_START' }, ctx),
+      { type: 'GAME_CLOCK_PAUSE' },
+      { now: T0 + 90_000, actor: 'uid_operator' },
+    );
+    const later = { now: T0 + 300_000, actor: 'uid_operator' };
+
+    const action: Action = { type: 'FOUL_ADJUST', side: 'home', delta: 1 };
+    const event = describeEvent(action, applyAction(paused, action, later), later);
+
+    // Frozen at the pause, not wound on by the 3.5 minutes since.
+    expect(event?.clockMs).toBe(paused.gameClock.remainingMs);
+  });
 });
 
 describe('describeEvent — what does not', () => {

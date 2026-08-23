@@ -69,7 +69,18 @@ export const TeamStateSchema = z.object({
   name: z.string().min(LIMITS.teamName.minLength).max(LIMITS.teamName.maxLength),
   score: z.number().int().min(LIMITS.score.min).max(LIMITS.score.max),
   fouls: z.number().int().min(LIMITS.fouls.min).max(LIMITS.fouls.max),
+  /** Timeouts left **in the current half** — refilled at every half boundary. */
   timeouts: z.number().int().min(LIMITS.timeouts.min).max(LIMITS.timeouts.max),
+  /**
+   * Timeouts taken across the whole match, never reset by a half boundary.
+   *
+   * Exists because `timeouts` alone stopped being able to answer "how many did
+   * they use": once it refills each half, the remaining count only describes
+   * the half in progress, and `config.timeouts - timeouts` — which is how
+   * `buildMatchRecord` used to derive it — silently forgets every timeout taken
+   * before the break. Only `NEW_GAME` clears this.
+   */
+  timeoutsUsed: z.number().int().min(LIMITS.timeouts.min).max(LIMITS.timeouts.max),
 });
 
 export type TeamState = z.infer<typeof TeamStateSchema>;
@@ -111,6 +122,13 @@ export const BoardConfigSchema = z.object({
   shotClockMs: z.number().int().min(1_000).max(LIMITS.shotClockMs.max),
   /** Shorter reset after an offensive rebound (14s under FIBA/NBA rules). */
   shotClockResetMs: z.number().int().min(1_000).max(LIMITS.shotClockMs.max),
+  /**
+   * Timeouts each team gets **per half**, not per game.
+   *
+   * A half is two periods, so this many are granted at the start of the game
+   * and again at every subsequent odd period (Q3, and each overtime). See
+   * `startsNewHalf`.
+   */
   timeouts: z.number().int().min(LIMITS.timeouts.min).max(LIMITS.timeouts.max),
   periodCount: z.number().int().min(LIMITS.periodCount.min).max(LIMITS.periodCount.max),
   startingPeriod: z.number().int().min(LIMITS.period.min).max(LIMITS.period.max),
@@ -212,7 +230,21 @@ export const BoardStateSchema = z.object({
 export type BoardState = z.infer<typeof BoardStateSchema>;
 
 function initialTeam(name: string, timeouts: number): TeamState {
-  return { name, score: 0, fouls: 0, timeouts };
+  return { name, score: 0, fouls: 0, timeouts, timeoutsUsed: 0 };
+}
+
+/**
+ * True when `period` opens a new half, and so refills both teams' timeouts.
+ *
+ * A half is two periods, so halves begin at the odd ones: Q1, Q3, and then each
+ * overtime (period 5, 7, …) — an overtime is its own short half and gets its
+ * own allocation, which matches how the rulebook treats it. The parity test is
+ * against the configured `startingPeriod`, so a board that opens at Q2 (a
+ * second-half-only fixture, say) still breaks in the right places rather than
+ * inheriting Q1's parity.
+ */
+export function startsNewHalf(period: number, startingPeriod: number): boolean {
+  return (period - startingPeriod) % 2 === 0;
 }
 
 /**
@@ -347,6 +379,9 @@ export function migrateLegacyState(
         LIMITS.timeouts.min,
         LIMITS.timeouts.max,
       ),
+      // The legacy scoreboard tracked only what was left, so how many had been
+      // taken is not recoverable — zero is the honest answer, not a guess.
+      timeoutsUsed: 0,
     },
     away: {
       name: pickName(source.awayTeamName, config.awayTeamName),
@@ -357,6 +392,7 @@ export function migrateLegacyState(
         LIMITS.timeouts.min,
         LIMITS.timeouts.max,
       ),
+      timeoutsUsed: 0,
     },
     gameClock: { running: false, endsAt: null, remainingMs: gameClockMs },
     shotClock: {
@@ -439,6 +475,21 @@ export function isBoardIdle(state: BoardState): boolean {
  * any period never played) are dropped rather than becoming keys with null
  * values.
  */
+/**
+ * Defaults `timeoutsUsed` to zero on a team that predates the field.
+ *
+ * A game already in progress when this deploys has teams written without it.
+ * Requiring it outright would fail the schema, which makes the whole board read
+ * as *absent* — the board would go blank mid-game and refuse every further
+ * write, which is precisely how the `periodScores` array bug behaved. A missing
+ * count means no timeouts were recorded, so zero is both safe and true enough.
+ */
+function withTimeoutsUsed(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw;
+  const team = raw as Record<string, unknown>;
+  return team['timeoutsUsed'] === undefined ? { ...team, timeoutsUsed: 0 } : team;
+}
+
 function restorePeriodScores(raw: unknown): unknown {
   if (raw === undefined || raw === null) return {};
   if (!Array.isArray(raw)) return raw;
@@ -479,6 +530,8 @@ export function parseLiveBoardState(raw: unknown): BoardState | null {
   const candidate = raw as Record<string, unknown>;
   const restored = {
     ...candidate,
+    home: withTimeoutsUsed(candidate['home']),
+    away: withTimeoutsUsed(candidate['away']),
     gameClock: withEndsAt(candidate['gameClock']),
     shotClock: withEndsAt(candidate['shotClock']),
     periodScores: restorePeriodScores(candidate['periodScores']),

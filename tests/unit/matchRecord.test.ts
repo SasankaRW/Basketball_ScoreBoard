@@ -40,7 +40,7 @@ describe('buildMatchRecord', () => {
     expect(record.boardName).toBe('Court 1');
   });
 
-  it('computes timeouts used as configured minus remaining', () => {
+  it('reports timeouts used from the running tally', () => {
     const state = play([
       { type: 'TIMEOUT_ADJUST', side: 'home', delta: -1 },
       { type: 'TIMEOUT_ADJUST', side: 'away', delta: -2 },
@@ -50,9 +50,27 @@ describe('buildMatchRecord', () => {
     expect(record.awayTimeoutsUsed).toBe(2);
   });
 
-  it('clamps timeouts used to zero rather than reporting negative', () => {
-    // An operator can restore a timeout past the configured starting count via
-    // the +/- pair — "used" has no sensible negative reading for that.
+  /**
+   * The reason the tally exists at all. Timeouts refill at the half, so
+   * deriving "used" from what is left — as this once did — reports only the
+   * second half and quietly loses everything before the break.
+   */
+  it('counts timeouts from both halves, not just the one the game ended in', () => {
+    const state = play([
+      { type: 'TIMEOUT_ADJUST', side: 'home', delta: -1 },
+      { type: 'NEXT_PERIOD' },
+      { type: 'NEXT_PERIOD' }, // into the second half — timeouts refill here
+      { type: 'TIMEOUT_ADJUST', side: 'home', delta: -1 },
+    ]);
+    const record = buildMatchRecord(state, ctx());
+
+    expect(state.home.timeouts).toBe(DEFAULT_CONFIG.timeouts - 1); // one left this half
+    expect(record.homeTimeoutsUsed).toBe(2); // but two across the match
+  });
+
+  it('never reports a negative count when an operator hands one back', () => {
+    // Restoring a timeout past the configured allowance is possible via the
+    // control panel's +/- pair; it did not "un-take" a timeout.
     const state = play([{ type: 'TIMEOUT_ADJUST', side: 'home', delta: 5 }]);
     const record = buildMatchRecord(state, ctx());
     expect(record.homeTimeoutsUsed).toBe(0);
