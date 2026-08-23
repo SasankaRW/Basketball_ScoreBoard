@@ -154,6 +154,44 @@ describe('parseLiveBoardState', () => {
     const raw = JSON.parse(JSON.stringify(original)) as Record<string, unknown>;
     expect(parseLiveBoardState(raw)).toEqual(original);
   });
+
+  /**
+   * The regression test for a bug that bricked a board the moment its first
+   * period ended.
+   *
+   * The Realtime Database has no separate array type: an integer-keyed object
+   * comes back as an array with holes, so `{ '1': … }` — written by the very
+   * first `NEXT_PERIOD` — reads back as `[null, … ]`. That failed the record
+   * schema, which made the whole board parse as *absent*, which made every
+   * later write fail the `rev` rule. The literal shapes below are what the
+   * emulator actually returned, not what the type says it should have.
+   */
+  it('restores periodScores that RTDB handed back as an array', () => {
+    const raw = JSON.parse(JSON.stringify(createInitialState())) as Record<string, unknown>;
+    raw['periodScores'] = [null, { home: 2, away: 3 }];
+
+    expect(parseLiveBoardState(raw)?.periodScores).toEqual({ '1': { home: 2, away: 3 } });
+  });
+
+  it('restores a multi-period array, keeping every index as its period key', () => {
+    const raw = JSON.parse(JSON.stringify(createInitialState())) as Record<string, unknown>;
+    raw['periodScores'] = [null, { home: 18, away: 15 }, { home: 31, away: 30 }];
+
+    expect(parseLiveBoardState(raw)?.periodScores).toEqual({
+      '1': { home: 18, away: 15 },
+      '2': { home: 31, away: 30 },
+    });
+  });
+
+  it('drops holes rather than turning them into null-valued periods', () => {
+    // A game whose second period was never snapshotted — sparse in, sparse out.
+    const raw = JSON.parse(JSON.stringify(createInitialState())) as Record<string, unknown>;
+    raw['periodScores'] = [null, { home: 18, away: 15 }, null, { home: 44, away: 41 }];
+
+    const parsed = parseLiveBoardState(raw);
+    expect(parsed).not.toBeNull();
+    expect(Object.keys(parsed!.periodScores)).toEqual(['1', '3']);
+  });
 });
 
 describe('isInBonus', () => {

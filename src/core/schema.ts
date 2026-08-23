@@ -420,17 +420,54 @@ export function isBoardIdle(state: BoardState): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Restores the nulls and empty objects the Realtime Database strips on write,
- * then validates against `BoardStateSchema`.
+ * Undoes the Realtime Database's array coercion of `periodScores`.
  *
- * RTDB deletes any key whose value is `null` (a paused clock's `endsAt`) or an
- * empty object (`periodScores` on a fresh board, before any period has ended),
- * so a value that was written as `{ endsAt: null }` or `{ periodScores: {} }`
- * comes back with that key simply *absent*. Every read of live board state —
- * on the client (`core/liveState.ts`) and inside the Cloud Functions that also
- * read RTDB directly (`functions/src/matches.ts`) — must go through this
- * before the data can be trusted, so both sides restore the same shape the
- * same way rather than each guessing at the gaps independently.
+ * RTDB does not store objects and arrays as distinct types. When every key of
+ * an object looks like a non-negative integer and enough of the range is
+ * filled, it hands the node back as a JavaScript *array* with holes — so
+ * `{ '1': { home: 2, away: 3 } }`, written after the first period ends, is read
+ * back as `[null, { home: 2, away: 3 }]`.
+ *
+ * That is not cosmetic. `PeriodScoresSchema` is a record, an array fails it,
+ * and a board whose state fails to parse reads as *absent*: the control panel
+ * shows "this board has no game state", and because every subsequent
+ * transaction then declines to advance `rev`, the security rules reject its
+ * writes too. Ending the first period would brick the board for the rest of the
+ * game — which is exactly what happened before this function existed.
+ *
+ * Indices are restored as string keys, and holes (the `null` at index 0, and
+ * any period never played) are dropped rather than becoming keys with null
+ * values.
+ */
+function restorePeriodScores(raw: unknown): unknown {
+  if (raw === undefined || raw === null) return {};
+  if (!Array.isArray(raw)) return raw;
+
+  const restored: Record<string, unknown> = {};
+  // `forEach` skips holes in a sparse array; the explicit null check covers the
+  // dense nulls the SDK produces for absent indices.
+  raw.forEach((entry, index) => {
+    if (entry !== null && entry !== undefined) restored[String(index)] = entry;
+  });
+  return restored;
+}
+
+/**
+ * Restores the shapes the Realtime Database mangles on the way in and out, then
+ * validates against `BoardStateSchema`.
+ *
+ * Three distinct pieces of RTDB behaviour have to be undone here. It deletes
+ * any key whose value is `null` (a paused clock's `endsAt`) or an empty object
+ * (`periodScores` on a fresh board, before any period has ended), so a value
+ * written as `{ endsAt: null }` or `{ periodScores: {} }` comes back with that
+ * key simply *absent*. And it re-types an integer-keyed object as an array —
+ * see `restorePeriodScores`.
+ *
+ * Every read of live board state — on the client (`core/liveState.ts`) and
+ * inside the serverless functions that also read RTDB directly
+ * (`src/server/matches.ts`) — must go through this before the data can be
+ * trusted, so both sides restore the same shape the same way rather than each
+ * guessing at the gaps independently.
  *
  * Returns null for anything that fails the schema. A malformed node is treated
  * as "no state" rather than crashing the page: a scoreboard on a gym wall must
@@ -444,7 +481,7 @@ export function parseLiveBoardState(raw: unknown): BoardState | null {
     ...candidate,
     gameClock: withEndsAt(candidate['gameClock']),
     shotClock: withEndsAt(candidate['shotClock']),
-    periodScores: candidate['periodScores'] ?? {},
+    periodScores: restorePeriodScores(candidate['periodScores']),
     scheduleId: candidate['scheduleId'] ?? null,
     logoUrl: candidate['logoUrl'] ?? null,
   };

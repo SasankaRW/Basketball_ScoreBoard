@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { createInitialState, DEFAULT_CONFIG, type BoardState } from '../../src/core/schema.js';
+import type { TimelineEvent } from '../../src/core/timeline.js';
 
 export const TENANT_A = 'tnt_aaaaaaaaaaaa';
 export const TENANT_B = 'tnt_bbbbbbbbbbbb';
@@ -24,6 +25,31 @@ export function claims(tenantId: string, role: Role, boardId?: string) {
 
 export function statePath(tenantId: string, boardId: string): string {
   return `live/${tenantId}/${boardId}/state`;
+}
+
+export function eventsPath(tenantId: string, boardId: string): string {
+  return `live/${tenantId}/${boardId}/events`;
+}
+
+/** A timeline entry that satisfies every `.validate` rule. */
+export function validEvent(overrides: Partial<TimelineEvent> = {}): Record<string, unknown> {
+  const base: TimelineEvent = {
+    ts: Date.now(),
+    period: 1,
+    clockMs: 480_000,
+    type: 'score',
+    side: 'home',
+    delta: 2,
+    home: 2,
+    away: 0,
+    actor: UID_OPERATOR_A,
+  };
+  // Null is how `side` is absent for a period change, and the Realtime Database
+  // strips such keys on write — dropping it here matches what production
+  // actually stores rather than testing a shape that never reaches the rules.
+  const merged: Record<string, unknown> = { ...base, ...overrides };
+  if (merged['side'] === null) delete merged['side'];
+  return merged;
 }
 
 /**

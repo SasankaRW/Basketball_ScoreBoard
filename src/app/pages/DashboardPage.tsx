@@ -18,6 +18,7 @@ import {
   inviteMember,
   removeMember,
   setMemberRole,
+  MATCH_AUDIT_ACTIONS,
   subscribeAudit,
   subscribeMembers,
   subscribeTenant,
@@ -440,7 +441,8 @@ function AuditSection({ tenantId }: { tenantId: string }) {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(
-    () => subscribeAudit(firestore, tenantId, setEvents, { limit: 50 }),
+    () =>
+      subscribeAudit(firestore, tenantId, setEvents, { limit: 50, actions: MATCH_AUDIT_ACTIONS }),
     [firestore, tenantId],
   );
 
@@ -449,7 +451,7 @@ function AuditSection({ tenantId }: { tenantId: string }) {
   return (
     <section className="section">
       <div className="section__head">
-        <h2>Activity</h2>
+        <h2>Match activity</h2>
         {events.length > 8 ? (
           <button
             type="button"
@@ -462,7 +464,7 @@ function AuditSection({ tenantId }: { tenantId: string }) {
       </div>
 
       {events.length === 0 ? (
-        <div className="card muted">Nothing recorded yet.</div>
+        <div className="card muted">No matches started or finished yet.</div>
       ) : (
         <div className="card card--flush">
           <table className="table">

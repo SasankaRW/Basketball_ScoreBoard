@@ -120,3 +120,53 @@ export function IconAlertTriangle(props: IconProps) {
     </svg>
   );
 }
+
+/*
+ * The four below are the match timeline's vocabulary. Each has to be
+ * recognisable at 14px in a dense list, so they lean on silhouette rather than
+ * detail — a ball's seams, a whistle's spout, a pause's two bars, a flag's
+ * pole — and none of them carry a label, because the row beside them already
+ * says what happened in words.
+ */
+
+/** A basket. */
+export function IconBall(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3v18M3 12h18" />
+      <path d="M5.6 5.6c3.5 3.5 3.5 9.3 0 12.8M18.4 5.6c-3.5 3.5-3.5 9.3 0 12.8" />
+    </svg>
+  );
+}
+
+/** A foul. */
+export function IconWhistle(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M13 9h7l-2.5 4H13" />
+      <circle cx="8" cy="13" r="5" />
+      <path d="M8 4v3" />
+    </svg>
+  );
+}
+
+/** A timeout — two bars, because a timeout is play stopping. */
+export function IconTimeout(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="6" y="5" width="4" height="14" rx="1.2" />
+      <rect x="14" y="5" width="4" height="14" rx="1.2" />
+    </svg>
+  );
+}
+
+/** A period boundary. */
+export function IconFlag(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 21V4" />
+      <path d="M6 5h11l-2.2 4L17 13H6" />
+    </svg>
+  );
+}

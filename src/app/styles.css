@@ -1071,13 +1071,24 @@ textarea:focus {
   margin-right: auto;
 }
 
-/* -------------------------------------------------------------- match card */
+/* -------------------------------------------------------------- match card
+ *
+ * A finished game is a *result*, so the card is laid out like one: a quiet
+ * meta line, then the matchup with the score set in the scoreboard's own
+ * Orbitron numerals — the same treatment .board-preview__score uses, so a
+ * result in the console looks like it came from the board that produced it.
+ * Everything else waits behind the disclosure.
+ */
 
 .match-card__header {
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'meta   toggle'
+    'match  toggle';
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-1) var(--space-4);
   background: none;
   border: 0;
   padding: 0;
@@ -1086,43 +1097,248 @@ textarea:focus {
   font: inherit;
   color: inherit;
   border-radius: var(--radius-sm);
-  transition: color var(--fast) var(--ease);
 }
+
 .match-card__meta {
-  min-width: 10rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  grid-area: meta;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 550;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
+/* A dot rather than a "·" glyph: it keeps its weight when the row wraps. */
+.match-card__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
+
 .match-card__matchup {
-  margin-right: auto;
+  grid-area: match;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.match-card__team {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 1rem;
   font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The away name is mirrored so both teams read outward from the score. */
+.match-card__matchup .match-card__team:last-child {
+  text-align: right;
 }
 .match-card__team--win {
   color: var(--blue);
 }
-.match-card__score {
+.match-card__team--loss {
   color: var(--text-muted);
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  margin: 0 var(--space-2);
+  font-weight: 500;
 }
+.match-card__score {
+  flex: 0 0 auto;
+  font-family: 'Orbitron', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 .match-card__toggle {
+  grid-area: toggle;
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  font-size: 0.8rem;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 550;
   color: var(--text-muted);
+  white-space: nowrap;
+  transition:
+    color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease);
 }
-.match-card__box {
-  margin-top: var(--space-4);
+.match-card__header:hover .match-card__toggle {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.match-card__detail {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.match-card__scroller {
   overflow-x: auto;
 }
-.match-card__summary {
+/* Period columns share the leftover width evenly, so a four-quarter game and a
+   double-overtime one both read as an even grid instead of drifting. */
+.table--box th:not(:first-child),
+.table--box td:not(:first-child) {
+  width: 3.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.table--box th:first-child,
+.table--box td:first-child {
+  width: auto;
+}
+.match-card__final {
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.match-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.stat {
+  flex: 1 1 8rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.stat__label {
+  font-size: 0.68rem;
+  font-weight: 550;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.stat__value {
+  margin-top: 0.15rem;
+  font-family: 'Orbitron', monospace;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.stat__sep {
+  margin: 0 0.3rem;
+  color: var(--text-faint);
+}
+
+/* ---------------------------------------------------------------- timeline */
+
+.timeline__title {
+  margin: 0 0 var(--space-3);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.timeline__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.timeline__period + .timeline__period {
   margin-top: var(--space-4);
-  gap: var(--space-5);
+}
+.timeline__period-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--blue);
+  margin-bottom: var(--space-2);
+}
+.timeline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  /* The rail: one continuous line down the period, which is what makes a list
+     of rows read as elapsed time rather than as a table. */
+  border-left: 1px solid var(--border);
+}
+.timeline__row {
+  display: grid;
+  grid-template-columns: 3.5rem 1.25rem 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.3rem 0 0.3rem var(--space-4);
+  position: relative;
   font-size: 0.85rem;
 }
-.match-card__summary strong {
-  color: var(--text);
+.timeline__row::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--space-4) - 3px);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+.timeline__row--score::before {
+  background: var(--blue);
+}
+.timeline__clock {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.timeline__icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.timeline__row--score .timeline__icon {
+  color: var(--blue);
+}
+.timeline__row--foul .timeline__icon {
+  color: var(--yellow);
+}
+.timeline__what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline__row--score .timeline__what {
+  font-weight: 600;
+}
+.timeline__score {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .match-card__score {
+    font-size: 1.3rem;
+  }
+  .timeline__row {
+    grid-template-columns: 3rem 1.25rem 1fr;
+    row-gap: 0;
+  }
+  /* The running score drops under the description rather than squeezing the
+     description into an ellipsis on a narrow phone. */
+  .timeline__score {
+    grid-column: 3;
+  }
 }
 
 /* ------------------------------------------------------------------ utility */

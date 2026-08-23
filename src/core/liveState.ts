@@ -15,7 +15,9 @@
  */
 import {
   onValue,
+  push,
   ref,
+  remove,
   runTransaction,
   set,
   type Database,
@@ -28,6 +30,7 @@ import {
   type BoardConfig,
   type BoardState,
 } from './schema.js';
+import { describeEvent } from './timeline.js';
 
 export function statePath(tenantId: string, boardId: string): string {
   return `live/${tenantId}/${boardId}/state`;
@@ -35,6 +38,50 @@ export function statePath(tenantId: string, boardId: string): string {
 
 function stateRef(db: Database, tenantId: string, boardId: string): DatabaseReference {
   return ref(db, statePath(tenantId, boardId));
+}
+
+export function eventsPath(tenantId: string, boardId: string): string {
+  return `live/${tenantId}/${boardId}/events`;
+}
+
+/**
+ * Keeps a board's timeline in step with an action that just committed.
+ *
+ * Two jobs, because two things can happen to a timeline. Most actions either
+ * append an entry or are ignored (`describeEvent` decides which). `NEW_GAME` is
+ * the exception: it discards the game without recording it, so its events have
+ * to go with it — otherwise the next game on this board opens with the last
+ * one's play-by-play already on it, which is a *wrong* timeline rather than an
+ * absent one. Doing it here rather than in the surfaces that offer the button
+ * means the control panel and the scoreboard's keyboard shortcut are both
+ * covered by construction. (The other way a game ends, `finishMatch`, clears
+ * the node server-side after harvesting it into the permanent record.)
+ *
+ * Deliberately *after* the state transaction rather than inside it: an RTDB
+ * transaction operates on a single ref and cannot also write a sibling node,
+ * and a timeline is a record of play, not play itself — a failed or slow event
+ * write must never fail or delay the basket an operator is waiting on
+ * courtside. The cost is that a client dying between the two drops one entry,
+ * which is the right trade for a log nothing depends on.
+ */
+function syncTimeline(
+  db: Database,
+  tenantId: string,
+  boardId: string,
+  action: Action,
+  after: BoardState,
+  ctx: ActionContext,
+): void {
+  const target = ref(db, eventsPath(tenantId, boardId));
+
+  if (action.type === 'NEW_GAME') {
+    void remove(target).catch(() => undefined);
+    return;
+  }
+
+  const event = describeEvent(action, after, ctx);
+  if (event === null) return;
+  void push(target, event).catch(() => undefined);
 }
 
 /**
@@ -169,6 +216,9 @@ export async function dispatchAction(
     // the caller should retry against the state that won.
     return deemedNoOp ? { status: 'unchanged', state: finalState } : { status: 'conflict' };
   }
+  // Only committed actions touch the timeline: a no-op changed nothing, and a
+  // conflict's action is retried, which would otherwise log it twice.
+  syncTimeline(db, tenantId, boardId, action, finalState, ctx);
   return { status: 'committed', state: finalState };
 }
 

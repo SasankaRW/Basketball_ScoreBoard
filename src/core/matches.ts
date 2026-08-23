@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { callApi } from './api.js';
 import type { PeriodPoints } from './matchRecord.js';
+import type { TimelineEvent } from './timeline.js';
 
 export interface MatchRecordDoc {
   id: string;
@@ -37,6 +38,16 @@ export interface MatchRecordDoc {
   durationMs: number;
   scheduleId: string | null;
   createdBy: string;
+  /**
+   * The play-by-play, in the order it happened.
+   *
+   * Empty for any match finished before timelines existed — those cannot be
+   * reconstructed, since nothing recorded the events at the time. The history
+   * page says so rather than rendering an empty section that reads as broken.
+   */
+  events: TimelineEvent[];
+  /** True when the game outran the cap and only the earliest events were kept. */
+  eventsTruncated: boolean;
 }
 
 function toMatch(id: string, data: Record<string, unknown>): MatchRecordDoc {
@@ -65,6 +76,8 @@ function toMatch(id: string, data: Record<string, unknown>): MatchRecordDoc {
     durationMs: num('durationMs'),
     scheduleId: typeof data['scheduleId'] === 'string' ? data['scheduleId'] : null,
     createdBy: str('createdBy', ''),
+    events: Array.isArray(data['events']) ? (data['events'] as TimelineEvent[]) : [],
+    eventsTruncated: data['eventsTruncated'] === true,
   };
 }
 

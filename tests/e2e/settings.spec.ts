@@ -21,7 +21,7 @@ test('a saved shot-clock length reaches the control panel', async ({ page }) => 
   await page.getByRole('link', { name: 'Control panel' }).click();
   await expect(page.getByRole('button', { name: '24s', exact: true })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Dashboard' }).click();
+  await page.getByRole('banner').getByRole('link', { name: 'Dashboard' }).click();
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByLabel('Shot clock (sec)').fill('20');
   await page.getByRole('button', { name: 'Save settings' }).click();

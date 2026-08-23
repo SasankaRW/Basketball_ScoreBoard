@@ -107,15 +107,28 @@ export function subscribeMembers(
   );
 }
 
+/**
+ * The audit actions that describe *play* rather than administration.
+ *
+ * The tenant audit log records both — provisioning, board and member changes,
+ * key rotations — but the dashboard feed is read by someone asking "what
+ * happened in the games", and admin noise buries that. Filtering in the query
+ * rather than after it matters: filtering client-side would spend the row limit
+ * on events that are then thrown away, so a busy tenant could show an empty
+ * feed despite having played matches.
+ */
+export const MATCH_AUDIT_ACTIONS = ['MATCH_STARTED', 'MATCH_FINISHED'] as const;
+
 export function subscribeAudit(
   firestore: Firestore,
   tenantId: string,
   onChange: (events: AuditEvent[]) => void,
-  options: { boardId?: string; limit?: number } = {},
+  options: { boardId?: string; limit?: number; actions?: readonly string[] } = {},
   onError?: (error: Error) => void,
 ): () => void {
   const constraints = [
     ...(options.boardId ? [where('boardId', '==', options.boardId)] : []),
+    ...(options.actions?.length ? [where('action', 'in', [...options.actions])] : []),
     orderBy('ts', 'desc'),
     fsLimit(options.limit ?? 100),
   ];

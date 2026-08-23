@@ -19,6 +19,7 @@ import {
   BOARD_B1,
   claims,
   createTestEnv,
+  eventsPath,
   statePath,
   TENANT_A,
   TENANT_B,
@@ -27,6 +28,7 @@ import {
   UID_OPERATOR_B,
   UID_OWNER_A,
   UID_VIEWER_A,
+  validEvent,
   validState,
 } from './helpers.js';
 
@@ -299,6 +301,165 @@ describe('write validation', () => {
       // scheduleId: null is what createInitialState produces by default and is
       // what RTDB actually stores — omitted entirely, just like periodScores.
       await assertSucceeds(write(validState({ rev: 2 })));
+    });
+  });
+});
+
+/**
+ * The timeline node. Its rules are stricter than `state`'s in one specific way
+ * — entries are append-only — because a record of what happened in a game is
+ * worth nothing if it can be quietly rewritten afterwards.
+ */
+describe('match timeline events', () => {
+  const eventRef = (db: ReturnType<typeof as>, tenantId: string, boardId: string, id = 'e1') =>
+    ref(db, `${eventsPath(tenantId, boardId)}/${id}`);
+
+  describe('who may append', () => {
+    it.each([
+      ['owner', true],
+      ['admin', true],
+      ['operator', true],
+      ['viewer', false],
+    ] as const)('append permission for %s is %s', async (role, allowed) => {
+      const db = as(`uid_${role}`, TENANT_A, role);
+      const write = set(eventRef(db, TENANT_A, BOARD_A1), validEvent());
+      await (allowed ? assertSucceeds(write) : assertFails(write));
+    });
+
+    it("denies appending to another tenant's board", async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertFails(set(eventRef(db, TENANT_B, BOARD_B1), validEvent()));
+    });
+
+    it('denies an unauthenticated writer', async () => {
+      const db = env.unauthenticatedContext().database();
+      await assertFails(set(eventRef(db, TENANT_A, BOARD_A1), validEvent()));
+    });
+  });
+
+  describe('who may read', () => {
+    beforeEach(async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await set(ref(ctx.database(), `${eventsPath(TENANT_A, BOARD_A1)}/e1`), validEvent());
+      });
+    });
+
+    it('lets a viewer read the timeline they cannot write', async () => {
+      const db = as(UID_VIEWER_A, TENANT_A, 'viewer');
+      await assertSucceeds(get(ref(db, eventsPath(TENANT_A, BOARD_A1))));
+      await assertFails(set(eventRef(db, TENANT_A, BOARD_A1, 'e2'), validEvent()));
+    });
+
+    it("denies reading another tenant's timeline", async () => {
+      const db = as(UID_OPERATOR_B, TENANT_B, 'operator');
+      await assertFails(get(ref(db, eventsPath(TENANT_A, BOARD_A1))));
+    });
+
+    it('lets a board-scoped overlay token read only its own board', async () => {
+      const db = as('uid_overlay', TENANT_A, 'overlay', BOARD_A1);
+      await assertSucceeds(get(ref(db, eventsPath(TENANT_A, BOARD_A1))));
+      await assertFails(get(ref(db, eventsPath(TENANT_A, BOARD_A2))));
+    });
+  });
+
+  /**
+   * The property being proved is that no one can quietly edit a game's record:
+   * a timeline may be appended to, or discarded whole, and nothing else.
+   *
+   * Two entries are seeded rather than one on purpose. Removing the *last*
+   * remaining entry and clearing the node are the same write as far as the
+   * Realtime Database is concerned — both leave the node non-existent — so a
+   * single-entry fixture cannot distinguish the two, and there is nothing to
+   * distinguish: both end with an empty timeline, which is the outcome
+   * discarding a game is meant to produce anyway.
+   */
+  describe('append-only', () => {
+    beforeEach(async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.database();
+        await set(ref(db, `${eventsPath(TENANT_A, BOARD_A1)}/e1`), validEvent());
+        await set(ref(db, `${eventsPath(TENANT_A, BOARD_A1)}/e2`), validEvent({ delta: 3 }));
+      });
+    });
+
+    it('denies overwriting an entry that already exists', async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertFails(set(eventRef(db, TENANT_A, BOARD_A1), validEvent({ delta: 99 })));
+    });
+
+    it('denies deleting one entry out of a timeline', async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertFails(set(eventRef(db, TENANT_A, BOARD_A1), null));
+    });
+
+    it('still allows appending alongside entries that are already there', async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertSucceeds(set(eventRef(db, TENANT_A, BOARD_A1, 'e3'), validEvent()));
+    });
+
+    // The one write that may replace the whole node, because discarding a game
+    // has to discard its timeline or the next game inherits it.
+    it('allows an operator to clear the whole timeline', async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertSucceeds(set(ref(db, eventsPath(TENANT_A, BOARD_A1)), null));
+    });
+
+    it('denies replacing the whole timeline with a different one', async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertFails(set(ref(db, eventsPath(TENANT_A, BOARD_A1)), { e1: validEvent() }));
+    });
+
+    it('denies a viewer clearing the timeline', async () => {
+      const db = as(UID_VIEWER_A, TENANT_A, 'viewer');
+      await assertFails(set(ref(db, eventsPath(TENANT_A, BOARD_A1)), null));
+    });
+  });
+
+  describe('shape', () => {
+    const append = (event: unknown, id = 'e1') => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      return set(eventRef(db, TENANT_A, BOARD_A1, id), event);
+    };
+
+    it('accepts a period change, which carries no side', async () => {
+      await assertSucceeds(append(validEvent({ type: 'period', side: null, delta: 0, period: 2 })));
+    });
+
+    it.each([
+      ['score', 'e_score'],
+      ['foul', 'e_foul'],
+      ['timeout', 'e_timeout'],
+    ] as const)('accepts a %s event', async (type, id) => {
+      await assertSucceeds(append(validEvent({ type, delta: -1 }), id));
+    });
+
+    it('rejects an unknown event type', async () => {
+      await assertFails(append(validEvent({ type: 'substitution' as never })));
+    });
+
+    it('rejects a missing required field', async () => {
+      const event = validEvent();
+      delete event['home'];
+      await assertFails(append(event));
+    });
+
+    it('rejects an unknown field, so a client cannot smuggle payload into the log', async () => {
+      await assertFails(append({ ...validEvent(), note: 'anything' }));
+    });
+
+    it('rejects out-of-range values', async () => {
+      await assertFails(append(validEvent({ period: 0 })));
+      await assertFails(append(validEvent({ home: 1000 })));
+      await assertFails(append(validEvent({ clockMs: -1 })));
+      await assertFails(append(validEvent({ delta: 500 })));
+    });
+
+    it('rejects a side that is neither team', async () => {
+      await assertFails(append(validEvent({ side: 'referee' as never })));
+    });
+
+    it('rejects an oversized actor', async () => {
+      await assertFails(append(validEvent({ actor: 'x'.repeat(200) })));
     });
   });
 });

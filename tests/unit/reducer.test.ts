@@ -276,9 +276,34 @@ describe('clocks', () => {
     expect(remainingAt(reset.shotClock, T0)).toBe(DEFAULT_CONFIG.shotClockMs);
   });
 
-  it('SHOT_CLOCK_RESET stays paused when the game clock is stopped', () => {
+  it('SHOT_CLOCK_RESET stays paused when nothing is running', () => {
     const reset = applyAction(state, { type: 'SHOT_CLOCK_RESET' }, ctx);
     expect(reset.shotClock.running).toBe(false);
+  });
+
+  /**
+   * Resets happen during live play, so stopping the clock to reset it would
+   * cost the operator a manual restart every time — and the seconds in between
+   * come off the possession.
+   */
+  it('SHOT_CLOCK_RESET keeps a running shot clock running', () => {
+    const ticking = applyAction(state, { type: 'SHOT_CLOCK_START' }, ctx);
+    expect(ticking.shotClock.running).toBe(true);
+
+    const reset = applyAction(ticking, { type: 'SHOT_CLOCK_RESET' }, ctx);
+    expect(reset.shotClock.running).toBe(true);
+    expect(remainingAt(reset.shotClock, T0)).toBe(DEFAULT_CONFIG.shotClockMs);
+  });
+
+  it('SHOT_CLOCK_RESET keeps running on the 14-second rebound reset too', () => {
+    const ticking = applyAction(state, { type: 'SHOT_CLOCK_START' }, ctx);
+    const reset = applyAction(
+      ticking,
+      { type: 'SHOT_CLOCK_RESET', remainingMs: DEFAULT_CONFIG.shotClockResetMs },
+      ctx,
+    );
+    expect(reset.shotClock.running).toBe(true);
+    expect(remainingAt(reset.shotClock, T0)).toBe(14_000);
   });
 
   it('supports the 14-second offensive-rebound reset', () => {

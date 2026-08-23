@@ -18,6 +18,7 @@ import {
   parseLiveBoardState,
   type BoardState,
 } from '../core/schema.js';
+import { MAX_TIMELINE_EVENTS, type TimelineEvent } from '../core/timeline.js';
 import { ApiError, database, firestore, writeAudit, type Caller } from './common.js';
 
 function boardsCollection(tenantId: string) {
@@ -26,6 +27,91 @@ function boardsCollection(tenantId: string) {
 
 function scheduleCollection(tenantId: string) {
   return firestore.collection('tenants').doc(tenantId).collection('schedule');
+}
+
+function eventsRef(tenantId: string, boardId: string) {
+  return database.ref(`live/${tenantId}/${boardId}/events`);
+}
+
+function num(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * Turns one stored RTDB entry back into a `TimelineEvent`.
+ *
+ * `side` needs restoring the same way `parseLiveBoardState` restores the
+ * clock's `endsAt`: a period change has `side: null`, and the Realtime Database
+ * deletes keys whose value is null, so it comes back *absent* rather than null.
+ */
+function parseEvent(raw: unknown): TimelineEvent | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const value = raw as Record<string, unknown>;
+  const type = value['type'];
+  if (type !== 'score' && type !== 'foul' && type !== 'timeout' && type !== 'period') return null;
+  const side = value['side'];
+
+  return {
+    ts: num(value['ts'], 0),
+    period: num(value['period'], 1),
+    clockMs: num(value['clockMs'], 0),
+    type,
+    side: side === 'home' || side === 'away' ? side : null,
+    delta: num(value['delta'], 0),
+    home: num(value['home'], 0),
+    away: num(value['away'], 0),
+    actor: typeof value['actor'] === 'string' ? value['actor'] : '',
+  };
+}
+
+/**
+ * Takes a board's timeline and clears it, in one atomic step.
+ *
+ * A read followed by a delete would leave a window in which an event appended
+ * between the two is destroyed without ever reaching history; a transaction
+ * that returns `null` captures and removes the node together, so anything that
+ * lands after this either made it into `captured` or is still there for the
+ * next game. That the node was just reset by the caller's state transaction is
+ * what makes "still there" harmless.
+ *
+ * Never throws: a match record that reaches history without its play-by-play is
+ * a lesser failure than a finished game that cannot be recorded at all.
+ */
+async function harvestEvents(
+  tenantId: string,
+  boardId: string,
+): Promise<{ events: TimelineEvent[]; eventsTruncated: boolean }> {
+  let captured: Record<string, unknown> | null = null;
+
+  try {
+    await eventsRef(tenantId, boardId).transaction((current: unknown) => {
+      captured =
+        current !== null && typeof current === 'object'
+          ? (current as Record<string, unknown>)
+          : null;
+      return null; // take it and clear it in the same operation
+    });
+  } catch {
+    return { events: [], eventsTruncated: false };
+  }
+
+  if (captured === null) return { events: [], eventsTruncated: false };
+
+  // Push IDs sort chronologically by construction, which is the whole reason
+  // for using them — sorting the keys restores the order events happened in,
+  // without trusting the object key order the SDK happened to hand back.
+  const ordered = Object.keys(captured)
+    .sort()
+    .map((key) => parseEvent((captured as Record<string, unknown>)[key]))
+    .filter((event): event is TimelineEvent => event !== null);
+
+  // Keeping the earliest events rather than the latest: a timeline that starts
+  // at tip-off and stops partway still reads as a game, whereas one that begins
+  // mid-third-quarter with no explanation does not.
+  return {
+    events: ordered.slice(0, MAX_TIMELINE_EVENTS),
+    eventsTruncated: ordered.length > MAX_TIMELINE_EVENTS,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +183,9 @@ export async function finishMatch(
 
   const matchRef = firestore.collection('tenants').doc(caller.tenantId).collection('matches').doc();
   const record = buildMatchRecord(finalState, { boardId, boardName, endedAt: now });
+  // After the state transaction, not before: the board is already reset, so
+  // every event this game could still produce has been written by now.
+  const { events, eventsTruncated } = await harvestEvents(caller.tenantId, boardId);
 
   await firestore.runTransaction(async (tx) => {
     // Read before write — Firestore transactions require every read to
@@ -108,7 +197,7 @@ export async function finishMatch(
       if (scheduleSnapshot.exists) scheduleRef = candidate;
     }
 
-    tx.set(matchRef, { ...record, createdBy: caller.uid });
+    tx.set(matchRef, { ...record, events, eventsTruncated, createdBy: caller.uid });
     if (scheduleRef) {
       tx.update(scheduleRef, { status: 'completed', matchId: matchRef.id, updatedAt: now });
     }
@@ -196,6 +285,10 @@ export async function startScheduledMatch(
   };
 
   await liveRef.set(initial);
+  // The board is idle, but idle is not the same as never-played: a game that
+  // was discarded rather than finished can have left its timeline behind, and
+  // this match must not open with the previous one's events already on it.
+  await eventsRef(caller.tenantId, boardId).remove();
   await scheduleRef.update({ status: 'in_progress', boardId, updatedAt: now });
 
   await writeAudit({

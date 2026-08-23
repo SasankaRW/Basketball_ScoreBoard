@@ -157,6 +157,62 @@
             "$other": { ".validate": false }
           },
 
+          // The play-by-play for the game currently on this board: every
+          // basket, foul, timeout and period change, appended as it happens and
+          // harvested into the permanent match record by finishMatch. Readable
+          // by any member of the tenant (and by this board's mirror/overlay,
+          // matching how `state` is read); writable only by the same roles that
+          // may run a game, because an event nobody could have caused is worse
+          // than no event at all.
+          "events": {
+            ".read": "auth != null && auth.token.tenantId === $tenantId && (auth.token.role === 'owner' || auth.token.role === 'admin' || auth.token.role === 'operator' || auth.token.role === 'viewer' || ((auth.token.role === 'overlay' || auth.token.role === 'mirror') && auth.token.boardId === $boardId))",
+
+            // Whole-node writes are how the timeline gets cleared: finishMatch
+            // removes it after harvesting, and NEW_GAME discards it with the
+            // game. Only a delete is allowed here — appending goes through
+            // $eventId below, so a single write cannot replace the history.
+            //
+            // This necessarily also permits deleting the sole remaining entry,
+            // since to the database that write and clearing the node are the
+            // same thing. Both leave an empty timeline, which is exactly what
+            // discarding a game is supposed to produce, so there is nothing to
+            // separate. Removing one entry from among others stays denied,
+            // which is the property that actually protects the record.
+            ".write": "auth != null && auth.token.tenantId === $tenantId && (auth.token.role === 'owner' || auth.token.role === 'admin' || auth.token.role === 'operator') && !newData.exists()",
+
+            "$eventId": {
+              // Append-only: an existing entry can never be rewritten or
+              // deleted individually. A timeline that can be edited after the
+              // fact is not a record of anything.
+              ".write": "auth != null && auth.token.tenantId === $tenantId && (auth.token.role === 'owner' || auth.token.role === 'admin' || auth.token.role === 'operator') && !data.exists() && newData.exists()",
+              ".validate": "newData.hasChildren(['ts','period','clockMs','type','delta','home','away','actor'])",
+              "ts": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "period": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10"
+              },
+              "clockMs": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "type": {
+                ".validate": "newData.isString() && (newData.val() === 'score' || newData.val() === 'foul' || newData.val() === 'timeout' || newData.val() === 'period')"
+              },
+              // Absent for whole-game events such as a period change — RTDB
+              // strips the null, so this is only validated when present.
+              "side": {
+                ".validate": "newData.isString() && (newData.val() === 'home' || newData.val() === 'away')"
+              },
+              "delta": {
+                ".validate": "newData.isNumber() && newData.val() >= -99 && newData.val() <= 99"
+              },
+              "home": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+              },
+              "away": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+              },
+              "actor": { ".validate": "newData.isString() && newData.val().length <= 128" },
+              "$other": { ".validate": false }
+            }
+          },
+
           "presence": {
             ".read": "auth != null && auth.token.tenantId === $tenantId && (auth.token.role === 'owner' || auth.token.role === 'admin' || auth.token.role === 'operator' || auth.token.role === 'viewer')",
             "$connectionId": {

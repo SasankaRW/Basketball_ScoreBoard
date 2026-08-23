@@ -67,6 +67,69 @@ test('scheduling, starting, playing, and finishing a match produces the right hi
   await expect(page.getByText('Completed')).toBeVisible();
 });
 
+/**
+ * The timeline's only honest test.
+ *
+ * Capture happens in the browser (core/liveState.ts), harvest happens in the
+ * serverless function (server/matches.ts), and render happens on another page
+ * entirely — three processes, none of which a unit test can hold together. The
+ * events asserted here therefore have to survive being written to the Realtime
+ * Database, moved into Firestore by `finishMatch`, and read back, in order.
+ */
+test('a played game produces a play-by-play in history', async ({ page }) => {
+  await signUp(page, freshAccount('timeline'));
+  await createBoard(page, 'Court 1');
+  await page.getByRole('link', { name: 'Control panel' }).click();
+
+  // Play a first quarter: a basket each way, a foul, and a timeout.
+  const scoreButtons = page.locator('.score-buttons .btn');
+  await scoreButtons.nth(1).click(); // home +2
+  await scoreButtons.nth(5).click(); // away +3
+  await expect(page.locator('.team-panel__score').first()).toHaveText('02');
+  await page.getByRole('button', { name: 'Increase home fouls' }).click();
+  await page.getByRole('button', { name: 'Use away timeout' }).click();
+
+  // Into the second, then one more basket, so the timeline has to group.
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Start next period' }).click();
+  await expect(page.locator('.clock-console__period')).toHaveText('Q2');
+  await scoreButtons.nth(0).click(); // home +1
+  await expect(page.locator('.team-panel__score').first()).toHaveText('03');
+
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Finish match' }).click();
+  await expect(page.getByRole('heading', { name: 'Match finished' })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await page.goto('/app/history');
+  await page.getByRole('button', { name: /Box score/ }).click();
+
+  // Grouped under the period each event belongs to — the period change itself
+  // heads Q2, because it is what started it.
+  await expect(page.locator('.timeline__period-label')).toHaveText(['Q1', 'Q2']);
+
+  await expect(page.locator('.timeline__what')).toHaveText([
+    'HOME +2',
+    'AWAY +3',
+    'Foul on HOME',
+    'Timeout — AWAY',
+    'Start of Q2',
+    'HOME +1',
+  ]);
+
+  // The running score is what makes it a story rather than a list; it must be
+  // the score *after* each event, not the final one repeated.
+  await expect(page.locator('.timeline__score')).toHaveText([
+    '2–0',
+    '2–3',
+    '2–3',
+    '2–3',
+    '2–3',
+    '3–3',
+  ]);
+});
+
 test('starting a scheduled match is blocked if the board turns busy after the picker opens', async ({
   page,
   context,

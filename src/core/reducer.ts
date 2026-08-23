@@ -321,7 +321,18 @@ function compute(state: BoardState, action: Action, ctx: ActionContext): BoardSt
         LIMITS.shotClockMs.min,
         LIMITS.shotClockMs.max,
       );
-      const reset = clock.createClock(target);
+      /**
+       * A reset keeps the shot clock running if it already was.
+       *
+       * Resets happen *during* live play — an offensive rebound, a shot hitting
+       * the rim — so stopping the clock to reset it means the operator has to
+       * restart it by hand every time, and the seconds between the two are lost
+       * off the possession. `setRemaining` preserves the running state; the
+       * game-clock check then also resumes a *stopped* shot clock when play is
+       * live, which is the ordinary courtside case of resetting just as the ball
+       * is put back in play.
+       */
+      const reset = clock.setRemaining(state.shotClock, target, now);
       const resumed = state.gameClock.running ? clock.startClock(reset, now) : reset;
       return clock.clocksEqual(state.shotClock, resumed) ? null : { ...state, shotClock: resumed };
     }
