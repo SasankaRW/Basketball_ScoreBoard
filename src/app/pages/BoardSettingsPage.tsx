@@ -20,7 +20,7 @@ import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconTrash } from '../components/icons.js';
 import { Alert, ConfirmDelete, CopyField, Field, Spinner } from '../components/ui.js';
-import { useBoard } from '../hooks.js';
+import { useBoard, useDispatch } from '../hooks.js';
 
 export function BoardSettingsPage() {
   const session = useSession();
@@ -28,6 +28,7 @@ export function BoardSettingsPage() {
   const { boardId } = useParams<{ boardId: string }>();
   const firestore = getFirestoreClient();
   const board = useBoard(session.tenantId, boardId);
+  const { dispatch } = useDispatch(session.tenantId, boardId, session.uid);
 
   const [keys, setKeys] = useState<ViewerKeys>({ overlayKey: null, mirrorKey: null });
   const [draft, setDraft] = useState<{ name: string; config: BoardConfig } | null>(null);
@@ -81,7 +82,20 @@ export function BoardSettingsPage() {
     try {
       const config = BoardConfigSchema.parse(draft.config);
       await updateBoard(firestore, session.tenantId, boardId, { name: draft.name.trim(), config });
-      setNotice('Saved. New settings apply the next time this board starts a new game.');
+      /**
+       * Push the same config onto the live board, not just the Firestore
+       * document.
+       *
+       * Live state carries its own snapshot of the config and nothing refreshes
+       * it in place, so without this a saved change reaches no surface anyone is
+       * actually looking at. CONFIG_SET is safe to apply mid-game: it swaps the
+       * config object and touches nothing else, so a running clock keeps its
+       * remaining time and only *future* resets use the new values. Display-only
+       * settings — tenths under a minute — take effect at once, which is the
+       * whole point of them being settings rather than a per-game choice.
+       */
+      await dispatch({ type: 'CONFIG_SET', patch: config });
+      setNotice('Saved. Clock and shot-clock lengths apply from the next reset or new game.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save those settings.');
     } finally {
