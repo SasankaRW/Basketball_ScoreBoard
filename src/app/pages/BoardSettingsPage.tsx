@@ -188,7 +188,7 @@ export function BoardSettingsPage() {
             />
           </Field>
 
-          <div className="field-row">
+          <div className="field-row" data-tour="rules">
             <Field label="Period length (min)">
               <input
                 type="number"
@@ -300,7 +300,7 @@ export function BoardSettingsPage() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section" data-tour="viewer-links">
         <div className="section__head">
           <h2>Share links</h2>
         </div>

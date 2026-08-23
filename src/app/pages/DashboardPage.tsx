@@ -284,7 +284,7 @@ function MembersSection({ tenantId }: { tenantId: string }) {
   }
 
   return (
-    <section className="section">
+    <section className="section" data-tour="members">
       <div className="section__head">
         <h2>Members</h2>
         <button type="button" className="btn btn--sm" onClick={() => setShowInvite(true)}>

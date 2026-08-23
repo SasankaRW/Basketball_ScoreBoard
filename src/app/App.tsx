@@ -9,6 +9,7 @@ import { JoinPage } from './pages/JoinPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { ProvisioningPage } from './pages/ProvisioningPage.js';
 import { SchedulePage } from './pages/SchedulePage.js';
+import { TourProvider } from './tour/TourProvider.js';
 import type { ReactNode } from 'react';
 
 /**
@@ -47,6 +48,16 @@ function NotFound() {
 export function App() {
   return (
     <AuthProvider>
+      <TourProvider>
+        <AppRoutes />
+      </TourProvider>
+    </AuthProvider>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <>
       <Routes>
         <Route path="/" element={<Navigate to="/app" replace />} />
         <Route path="/login" element={<LoginPage />} />
@@ -95,6 +106,6 @@ export function App() {
 
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </AuthProvider>
+    </>
   );
 }

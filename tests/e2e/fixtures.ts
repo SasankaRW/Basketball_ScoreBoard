@@ -29,8 +29,36 @@ export function freshAccount(label: string): TestAccount {
   };
 }
 
+/**
+ * Opts this browser context out of the guided tour.
+ *
+ * The tour auto-starts for anyone who has not seen it, which every test account
+ * is by definition — it would put a scrim over the page a second after each
+ * signup and swallow the next click. Suppressing it here mirrors what a
+ * returning user's browser already holds, rather than adding a test-only escape
+ * hatch to the tour itself.
+ *
+ * Registered on the *context* rather than the page, so the second tabs several
+ * tests open — the concurrent-writer and rotated-key cases — are covered too,
+ * including ones created after this call. It runs before the app's own code on
+ * every navigation, so the flag is in place before the provider reads it.
+ */
+async function suppressTour(page: Page): Promise<void> {
+  await page.context().addInitScript(() => {
+    // The provider keys progress by uid, which the page does not know until
+    // sign-in completes. Rather than guess it, shim the read: anything asking
+    // for a tour key is told the tour has been dismissed.
+    const real = Storage.prototype.getItem;
+    Storage.prototype.getItem = function getItem(key: string) {
+      if (key.startsWith('scoreboard.tour.')) return JSON.stringify({ dismissed: true, seen: [] });
+      return real.call(this, key);
+    };
+  });
+}
+
 /** Signs up through the real UI and waits for the dashboard to render. */
 export async function signUp(page: Page, account: TestAccount): Promise<void> {
+  await suppressTour(page);
   await page.goto('/login');
   await page.getByRole('button', { name: 'Create an organisation' }).click();
 

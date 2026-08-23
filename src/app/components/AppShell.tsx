@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../AuthProvider.js';
 import { useConnection } from '../hooks.js';
+import { Tour } from '../tour/Tour.js';
+import { useTour } from '../tour/TourProvider.js';
+import { IconHelp } from './icons.js';
 import { RoleBadge } from './ui.js';
 import { isMemberRole } from '../../core/roles.js';
 
@@ -9,6 +12,7 @@ export function AppShell({ tenantName, children }: { tenantName: string; childre
   const { state, signOut } = useAuth();
   const connected = useConnection();
   const session = state.status === 'signed-in' ? state.session : null;
+  const tour = useTour();
 
   return (
     <div className="app-shell">
@@ -38,6 +42,23 @@ export function AppShell({ tenantName, children }: { tenantName: string; childre
           {!connected ? <span className="badge">Offline</span> : null}
           {session && isMemberRole(session.role) ? <RoleBadge role={session.role} /> : null}
           <span className="muted topbar__email">{session?.email}</span>
+          {/*
+            Always present, never disabled away: someone looking for help should
+            find the same control in the same place on every page. Pages with no
+            tour of their own simply have nothing to open.
+          */}
+          {tour.available ? (
+            <button
+              type="button"
+              className="btn btn--sm topbar__help"
+              data-tour="help"
+              onClick={tour.start}
+              title="Show me around this page"
+            >
+              <IconHelp size={14} />
+              Help
+            </button>
+          ) : null}
           <button type="button" className="btn btn--sm" onClick={() => void signOut()}>
             Sign out
           </button>
@@ -45,6 +66,8 @@ export function AppShell({ tenantName, children }: { tenantName: string; childre
       </header>
 
       <main className="page">{children}</main>
+
+      <Tour />
     </div>
   );
 }

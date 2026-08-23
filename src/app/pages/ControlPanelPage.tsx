@@ -35,10 +35,12 @@ import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconExternalLink } from '../components/icons.js';
 import { Alert, Field, Modal, Spinner } from '../components/ui.js';
+import { useTour } from '../tour/TourProvider.js';
 import { useBoard, useBoardState, useDispatch, useNow } from '../hooks.js';
 
 export function ControlPanelPage() {
   const session = useSession();
+  const { running: tourRunning } = useTour();
   const navigate = useNavigate();
   const { boardId } = useParams<{ boardId: string }>();
   const board = useBoard(session.tenantId, boardId);
@@ -148,9 +150,12 @@ export function ControlPanelPage() {
   }, [state, now, buzzers]);
 
   // Keyboard parity with the scoreboard, so muscle memory carries between the
-  // two surfaces. Suppressed while a text field has focus.
+  // two surfaces. Suppressed while a text field has focus, and while the guided
+  // tour is open — the tour steps through with the arrow keys, which are also
+  // this page's score shortcuts, so leaving both live would quietly add points
+  // to a game while explaining how to add points to a game.
   useEffect(() => {
-    if (readOnly || !state) return;
+    if (readOnly || !state || tourRunning) return;
 
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -209,7 +214,7 @@ export function ControlPanelPage() {
 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [dispatch, readOnly, state]);
+  }, [dispatch, readOnly, state, tourRunning]);
 
   if (!boardId) return <Alert kind="error">No board specified.</Alert>;
   if (board === undefined || (!loaded && !error)) return <Spinner label="Opening board…" />;
@@ -302,7 +307,7 @@ export function ControlPanelPage() {
             />
           </div>
 
-          <aside className="stack">
+          <aside className="stack" data-tour="game-actions">
             <GameActions
               state={state}
               boardConfig={board.config}
@@ -789,7 +794,7 @@ function ShortcutCard() {
   ];
 
   return (
-    <div className="card">
+    <div className="card" data-tour="shortcuts">
       <h3 className="shortcut-card__title">Keyboard</h3>
       <ul className="shortcut-list">
         {shortcuts.map(([key, description]) => (

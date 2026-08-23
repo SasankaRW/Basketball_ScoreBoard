@@ -121,6 +121,16 @@ export function IconAlertTriangle(props: IconProps) {
   );
 }
 
+export function IconHelp(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.6 9.3a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.4" />
+      <path d="M12 16.8v.1" />
+    </svg>
+  );
+}
+
 /*
  * The four below are the match timeline's vocabulary. Each has to be
  * recognisable at 14px in a dense list, so they lean on silhouette rather than
