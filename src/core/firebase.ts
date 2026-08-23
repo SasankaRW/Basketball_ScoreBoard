@@ -20,7 +20,14 @@
  * no `functions` client here to construct.
  */
 import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  inMemoryPersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import { connectDatabaseEmulator, getDatabase, type Database } from 'firebase/database';
 import { DATABASE_URL, PROJECT_ID } from './firebaseConfig.js';
 
@@ -68,18 +75,61 @@ export function shouldUseEmulators(): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
+export interface FirebaseOptionsForSurface {
+  /**
+   * Keep this surface's session in memory only, never in browser storage.
+   *
+   * Set by the mirror and the overlay, and by nothing else. Those two sign in
+   * with a viewer custom token, and Firebase Auth persists a session per
+   * *origin* — so with ordinary persistence, opening a mirror link in the same
+   * browser as the console overwrites the operator's own session with a
+   * `role: 'mirror'` one. The symptom is remote from the cause and reads like
+   * a permissions bug: the dashboard comes back saying "You have read-only
+   * access to this board".
+   *
+   * In-memory persistence scopes the viewer session to that one tab and leaves
+   * storage untouched, which is also simply correct for these pages — they
+   * re-exchange the key in the URL on every load, so they have nothing to gain
+   * from a persisted session.
+   */
+  ephemeralAuth?: boolean;
+}
+
 let cached: {
   app: FirebaseApp;
   auth: Auth;
   db: Database;
   usingEmulators: boolean;
+  ephemeralAuth: boolean;
 } | null = null;
 
-export function getFirebase() {
-  if (cached) return cached;
+export function getFirebase(options: FirebaseOptionsForSurface = {}) {
+  const ephemeralAuth = options.ephemeralAuth ?? false;
+
+  if (cached) {
+    // Only an *explicit* conflicting request is an error. Most callers —
+    // `callApi`, `ensureFirestoreClient`, every console page — pass no options
+    // at all and simply want whatever this page already built; on a viewer
+    // surface that is legitimately the ephemeral instance, and treating an
+    // omitted option as "asked for persistent" would reject them.
+    if (options.ephemeralAuth !== undefined && cached.ephemeralAuth !== ephemeralAuth) {
+      throw new Error(
+        `getFirebase() was already initialised with ephemeralAuth=${cached.ephemeralAuth}; ` +
+          `a later call asked for ${ephemeralAuth}. Viewer surfaces must be the first to ` +
+          'initialise Firebase on their page.',
+      );
+    }
+    return cached;
+  }
 
   const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
+  // `initializeAuth` rather than `getAuth` so persistence is explicit. The
+  // non-ephemeral list mirrors what `getAuth` picks on the web by default.
+  const auth = initializeAuth(app, {
+    persistence: ephemeralAuth
+      ? inMemoryPersistence
+      : [indexedDBLocalPersistence, browserLocalPersistence],
+  });
   const db = getDatabase(app);
   const usingEmulators = shouldUseEmulators();
 
@@ -90,7 +140,7 @@ export function getFirebase() {
     connectDatabaseEmulator(db, EMULATOR_HOST, EMULATOR_PORTS.database);
   }
 
-  cached = { app, auth, db, usingEmulators };
+  cached = { app, auth, db, usingEmulators, ephemeralAuth };
   return cached;
 }
 
