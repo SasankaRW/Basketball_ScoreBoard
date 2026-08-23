@@ -340,6 +340,18 @@ function Timeline({ match }: { match: MatchRecordDoc }) {
                   >
                     <span className="timeline__clock">{formatGameClock(event.clockMs)}</span>
 
+                    {/*
+                      Source order *is* column order — the grid places these by
+                      position, so home / score / away has to be written the way
+                      it is read. Emitting the two team cells together and the
+                      score after them, as this once did, put the away cell in
+                      the score's column and the score in the away column, which
+                      is what made every row line up differently.
+
+                      The score stays on one line: `tests/e2e/matches.spec.ts`
+                      asserts its text is exactly "2–0", and JSX joins elements
+                      split across lines with a space.
+                    */}
                     {event.side === null ? (
                       <span className="timeline__cell timeline__cell--full">
                         <Entry event={event} teamName="" />
@@ -351,6 +363,12 @@ function Timeline({ match }: { match: MatchRecordDoc }) {
                             <Entry event={event} teamName={match.homeTeamName} />
                           ) : null}
                         </span>
+
+                        <span className="timeline__score">
+                          <span className={scoreHalfClass(event, 'home')}>{event.home}</span>–
+                          <span className={scoreHalfClass(event, 'away')}>{event.away}</span>
+                        </span>
+
                         <span className="timeline__cell timeline__cell--away">
                           {event.side === 'away' ? (
                             <Entry event={event} teamName={match.awayTeamName} />
@@ -358,16 +376,6 @@ function Timeline({ match }: { match: MatchRecordDoc }) {
                         </span>
                       </>
                     )}
-
-                    {/*
-                      Kept on one line: `tests/e2e/matches.spec.ts` asserts the
-                      text is exactly "2–0", and JSX joins elements split across
-                      lines with a space.
-                    */}
-                    <span className="timeline__score">
-                      <span className={scoreHalfClass(event, 'home')}>{event.home}</span>–
-                      <span className={scoreHalfClass(event, 'away')}>{event.away}</span>
-                    </span>
                   </li>
                 ))}
               </ol>

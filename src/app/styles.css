@@ -1325,11 +1325,23 @@ textarea:focus {
   /* The rail: one continuous line down the period, which is what makes a list
      of rows read as elapsed time rather than as a table. */
   border-left: 1px solid var(--border);
+  /* Capped because the two sides are only readable as a pair while they stay
+     within an eye span of the score between them. Left to fill a wide card,
+     the same rows spread until each side has to be read on its own, which is
+     the layout this replaced. */
+  max-width: 46rem;
 }
 
+/*
+ * Every row is its own grid — the columns can only line up if each row resolves
+ * them identically. That rules out sizing the score column to its content:
+ * `auto` makes "3–0" narrower than "11–16", which changes what is left for the
+ * two `1fr` team columns and shifts the whole row. A fixed width is what keeps
+ * the four columns in the same place down the whole list.
+ */
 .timeline__row {
   display: grid;
-  grid-template-columns: 3.5rem 1fr auto 1fr;
+  grid-template-columns: 3.5rem 1fr 4.75rem 1fr;
   align-items: center;
   gap: var(--space-3);
   padding: 0.3rem 0 0.3rem var(--space-4);
@@ -1376,8 +1388,10 @@ textarea:focus {
 .timeline__cell--home {
   flex-direction: row-reverse;
 }
+/* A period boundary belongs to the game rather than to either team, so it
+   spans every column instead of picking a side. */
 .timeline__cell--full {
-  grid-column: 2 / 4;
+  grid-column: 2 / -1;
   justify-content: center;
 }
 
@@ -1433,6 +1447,7 @@ textarea:focus {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: center;
 }
 /* Only the half that just moved is lit, which turns the column into a record of
    who was scoring rather than a number to be compared against the row above. */
@@ -1446,8 +1461,7 @@ textarea:focus {
   color: var(--away);
 }
 
-/* A period boundary belongs to the game, not to either team, so it reads as a
-   rule across the row rather than as another entry in a column. */
+/* Read as a rule across the row rather than as another entry in a column. */
 .timeline__row--period {
   margin: var(--space-2) 0;
   color: var(--text-faint);
@@ -1465,9 +1479,11 @@ textarea:focus {
     font-size: 1.3rem;
   }
   /* Columns collapse to one: the mirrored layout needs width to read as two
-     sides, and below that the colour and name carry the attribution alone. */
+     sides, and below that the colour and name carry the attribution alone.
+     Both team cells are assigned the same column — only one is ever filled,
+     and `:empty` takes the other out of the flow so they cannot overlap. */
   .timeline__row {
-    grid-template-columns: 3rem 1fr auto;
+    grid-template-columns: 3rem 1fr 4.25rem;
   }
   .timeline__cell--home,
   .timeline__cell--away,
@@ -1481,6 +1497,7 @@ textarea:focus {
   }
   .timeline__score {
     grid-column: 3;
+    text-align: right;
   }
   .timeline__row--period .timeline__cell--full::before {
     display: none;

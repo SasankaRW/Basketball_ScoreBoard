@@ -149,15 +149,18 @@ test('a played game produces a play-by-play in history', async ({ page }) => {
   await expect(page.locator('.timeline__row--away .timeline__team').first()).toHaveText('AWAY');
 
   // The running score is what makes it a story rather than a list; it must be
-  // the score *after* each event, not the final one repeated.
-  await expect(page.locator('.timeline__score')).toHaveText([
-    '2–0',
-    '2–3',
-    '2–3',
-    '2–3',
-    '2–3',
-    '3–3',
-  ]);
+  // the score *after* each event, not the final one repeated. Five entries, not
+  // six: the period change spans the row as a divider and carries no score of
+  // its own, so the score column stays a column.
+  await expect(page.locator('.timeline__score')).toHaveText(['2–0', '2–3', '2–3', '2–3', '3–3']);
+
+  // The columns only line up if every row resolves them the same way, which is
+  // a property of the row geometry rather than of any one row: pin the score
+  // column to a single x-position across rows on both sides.
+  const scoreLefts = await page
+    .locator('.timeline__score')
+    .evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().left)));
+  expect(new Set(scoreLefts).size).toBe(1);
 });
 
 test('starting a scheduled match is blocked if the board turns busy after the picker opens', async ({
