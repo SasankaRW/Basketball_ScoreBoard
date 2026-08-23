@@ -16,6 +16,23 @@ import {
   type FirebaseStorage,
 } from 'firebase/storage';
 
+/**
+ * Whether the per-board logo upload UI is offered at all.
+ *
+ * Firebase Storage requires the Blaze (pay-as-you-go) plan — the Spark free
+ * tier cannot provision a bucket, so every upload fails at the CORS
+ * preflight against a bucket that does not exist. In the browser that
+ * surfaces as an opaque CORS error rather than anything a user could act on,
+ * so the control is hidden rather than left to fail: an affordance that
+ * cannot work is worse than one that is not there.
+ *
+ * Everything behind this flag is complete and tested (src/server, storage.rules,
+ * tests/rules/storage.test.ts, tests/e2e/logo.spec.ts). To restore it: put the
+ * project on Blaze, enable Storage in the Firebase console, run
+ * `npx firebase deploy --only storage`, and flip this to true.
+ */
+export const LOGO_UPLOAD_ENABLED: boolean = false;
+
 export const LOGO_LIMITS = {
   maxBytes: 2 * 1024 * 1024,
   types: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const,

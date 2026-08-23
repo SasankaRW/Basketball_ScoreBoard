@@ -8,11 +8,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
 import { createBoard, freshAccount, signUp } from './fixtures.js';
+import { LOGO_UPLOAD_ENABLED } from '../../src/core/storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOGO_FIXTURE = path.join(__dirname, '..', 'fixtures', 'logo.png');
 
 test.describe.configure({ mode: 'serial' });
+
+// Skipped, not deleted, while Firebase Storage is unavailable on the free
+// plan (see LOGO_UPLOAD_ENABLED in src/core/storage.ts). These come back
+// automatically the moment the flag flips, so the feature never ships
+// unverified — which is the whole reason to skip rather than remove them.
+test.skip(!LOGO_UPLOAD_ENABLED, 'logo upload is disabled until Firebase Storage is provisioned');
 
 test('an owner can upload a tournament logo and see it on the scoreboard', async ({ page }) => {
   await signUp(page, freshAccount('logo'));

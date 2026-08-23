@@ -17,7 +17,12 @@ import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { finishMatch } from '../../core/matches.js';
 import { canControlBoard, canManageBoards } from '../../core/roles.js';
 import { isInBonus, LIMITS, type BoardState, type Side } from '../../core/schema.js';
-import { removeBoardLogo, uploadBoardLogo, validateLogoFile } from '../../core/storage.js';
+import {
+  LOGO_UPLOAD_ENABLED,
+  removeBoardLogo,
+  uploadBoardLogo,
+  validateLogoFile,
+} from '../../core/storage.js';
 import { ensureStorageClient } from '../../core/storageClient.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
@@ -249,7 +254,7 @@ export function ControlPanelPage() {
               onFinish={() => void handleFinish()}
               finishing={finishing}
             />
-            {canManageBoards(session.role) ? (
+            {LOGO_UPLOAD_ENABLED && canManageBoards(session.role) ? (
               <LogoCard
                 board={board}
                 tenantId={session.tenantId}
