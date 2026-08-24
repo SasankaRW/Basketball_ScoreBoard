@@ -205,6 +205,74 @@ h3 {
   max-width: 18ch;
 }
 
+/*
+ * The top bar is the one element on every page, so it is also the one element
+ * that can force the whole console to scroll sideways — which it did, on every
+ * screen narrower than about 900px.
+ *
+ * It sheds in order of what a narrow screen can spare. The organisation name
+ * and the signed-in email go first: both are context the page heading and the
+ * account menu already carry, and neither is something anyone navigates by.
+ * Below that the nav drops to its own full-width row, so the brand, Help and
+ * Sign out keep a line to themselves instead of competing for it.
+ */
+@media (max-width: 980px) {
+  .topbar__tenant,
+  .topbar__email {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    padding: 0.7rem var(--space-4);
+  }
+  /* The spacer exists to push .topbar__meta right on one line; once the bar
+     wraps, margin-left does that job without reserving a whole flex child. */
+  .topbar__spacer {
+    display: none;
+  }
+  .topbar__meta {
+    margin-left: auto;
+    gap: var(--space-2);
+  }
+  .topbar__nav {
+    order: 3;
+    width: 100%;
+    /* Scrolls rather than wraps: three tabs on two lines reads as two groups. */
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar__nav::-webkit-scrollbar {
+    display: none;
+  }
+  .topbar__navlink {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 420px) {
+  /*
+   * At this width the role badge is the least load-bearing thing left: it
+   * describes an account that has not changed since the last screen. The
+   * "Offline" badge stays — it is the only thing here reporting a condition
+   * rather than a fact, and it is precisely when a phone is on a bad
+   * connection that it matters.
+   */
+  .topbar__meta .badge--owner,
+  .topbar__meta .badge--admin,
+  .topbar__meta .badge--operator,
+  .topbar__meta .badge--viewer {
+    display: none;
+  }
+  /* The mark alone still identifies the product and still links home. */
+  .topbar__brand span {
+    display: none;
+  }
+}
+
 .page {
   flex: 1;
   width: 100%;
@@ -254,8 +322,16 @@ h3 {
   box-shadow: var(--shadow-sm);
   padding: 1.15rem;
 }
+/*
+ * Every use of this is a card wrapping a full-width table, and a table is the
+ * one thing on these pages with a width of its own that no amount of stacking
+ * can reduce. Scrolling it inside its card is what keeps a narrow screen from
+ * scrolling the *page* sideways instead — the columns stay readable and the
+ * rest of the layout stays put.
+ */
 .card--flush {
   padding: 0;
+  overflow-x: auto;
 }
 
 .board-grid {
@@ -1475,32 +1551,100 @@ textarea:focus {
 }
 
 @media (max-width: 640px) {
-  .match-card__score {
-    font-size: 1.3rem;
-  }
-  /* Columns collapse to one: the mirrored layout needs width to read as two
-     sides, and below that the colour and name carry the attribution alone.
-     Both team cells are assigned the same column — only one is ever filled,
-     and `:empty` takes the other out of the flow so they cannot overlap. */
+  /*
+   * The mirrored layout needs width to read as two sides. Below that it
+   * collapses to a single lane — clock, what happened, running score — with the
+   * team's colour and name carrying the attribution that position used to.
+   *
+   * Flex rather than a narrower grid, deliberately. Both team cells are always
+   * in the DOM and only one is ever filled, so a grid has to be told to put two
+   * elements in the same column; auto-placement instead walks past that column
+   * and drops the second one onto a *new row*, which is exactly what it did —
+   * every away event rendered as two lines. Flex has no placement cursor to
+   * fight: the empty cell is removed and the filled one simply takes the space.
+   */
   .timeline__row {
-    grid-template-columns: 3rem 1fr 4.25rem;
+    display: flex;
+    align-items: center;
+  }
+  .timeline__clock {
+    flex: 0 0 3rem;
   }
   .timeline__cell--home,
   .timeline__cell--away,
   .timeline__cell--full {
-    grid-column: 2;
+    flex: 1 1 auto;
     flex-direction: row;
     justify-content: flex-start;
+    order: 2;
   }
   .timeline__cell:empty {
     display: none;
   }
+  .timeline__team {
+    /* Free to shrink now that it is not defending a column width — the name is
+       the one part of a row that can be abbreviated and still be understood. */
+    flex: 0 1 auto;
+  }
+  /*
+   * Ordered rather than left in source order. The score sits between the two
+   * team cells in the markup — which is what makes the wide layout line up —
+   * so on a single lane, where the empty cell is removed, an away event would
+   * otherwise print its score before the event it belongs to.
+   */
   .timeline__score {
-    grid-column: 3;
+    flex: 0 0 auto;
+    order: 3;
+    margin-left: auto;
     text-align: right;
   }
-  .timeline__row--period .timeline__cell--full::before {
+  /* The flanking rules need room the divider no longer has. */
+  .timeline__row--period .timeline__cell--full::before,
+  .timeline__row--period .timeline__cell--full::after {
     display: none;
+  }
+
+  /* The result reads as a result before it reads as a row of controls, so the
+     disclosure moves under the score rather than squeezing the team names into
+     initials beside it. */
+  .match-card__header {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'meta'
+      'match'
+      'toggle';
+    gap: var(--space-2);
+  }
+  .match-card__score {
+    font-size: 1.4rem;
+  }
+  .match-card__toggle {
+    justify-content: center;
+    margin-top: var(--space-1);
+  }
+  .match-card__stats {
+    gap: var(--space-2);
+  }
+  .stat {
+    flex: 1 1 6.5rem;
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+@media (max-width: 420px) {
+  /* Narrowed rather than dropped: when an event happened is real information,
+     and mm:ss in tabular numerals still fits once it stops reserving room for
+     a wider column than it needs. */
+  .timeline__clock {
+    flex: 0 0 2.6rem;
+    font-size: 0.7rem;
+  }
+  .timeline__row {
+    gap: var(--space-2);
+    padding-left: var(--space-3);
+  }
+  .match-card__team {
+    font-size: 0.9rem;
   }
 }
 
