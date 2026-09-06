@@ -47,6 +47,31 @@ export function ShortcutEditor({
   useEffect(() => {
     if (!capturing) return;
 
+    // Shared by both input types: given whatever the browser calls the
+    // physical control that was pressed, either bind it or explain why not.
+    const tryBind = (code: string, shift: boolean, meta: boolean, ctrl: boolean, alt: boolean) => {
+      if (meta || ctrl || alt) {
+        setNotice(
+          'Only a plain key/button or Shift + key/button can be used — Ctrl, Alt and ⌘ are reserved.',
+        );
+        return;
+      }
+      if (!isBindableCode(code)) {
+        setNotice(`${formatCode(code)} cannot be used as a shortcut.`);
+        return;
+      }
+
+      const binding = { code, shift };
+      const { keymap: next, displaced } = withBinding(keymap, capturing, binding);
+      onChange(next);
+      setNotice(
+        displaced
+          ? `${formatBinding(binding)} was on “${commandLabel(displaced)}”, which now has no shortcut.`
+          : null,
+      );
+      setCapturing(null);
+    };
+
     const onKey = (event: KeyboardEvent) => {
       // Swallowed whether or not it turns into a binding: while the prompt is
       // armed every key belongs to it, including the ones it rejects.
@@ -61,28 +86,33 @@ export function ShortcutEditor({
         setCapturing(null);
         return;
       }
-      if (event.metaKey || event.ctrlKey || event.altKey) {
-        setNotice('Only a plain key or Shift + key can be used — Ctrl, Alt and ⌘ are reserved.');
-        return;
-      }
-      if (!isBindableCode(event.code)) {
-        setNotice(`${formatCode(event.code)} cannot be used as a shortcut.`);
-        return;
-      }
-
-      const binding = { code: event.code, shift: event.shiftKey };
-      const { keymap: next, displaced } = withBinding(keymap, capturing, binding);
-      onChange(next);
-      setNotice(
-        displaced
-          ? `${formatBinding(binding)} was on “${commandLabel(displaced)}”, which now has no shortcut.`
-          : null,
-      );
-      setCapturing(null);
+      tryBind(event.code, event.shiftKey, event.metaKey, event.ctrlKey, event.altKey);
     };
 
+    const onMouseDown = (event: MouseEvent) => {
+      // The plain left click is never bindable (see isBindableCode) and is
+      // also how this editor is itself operated — leaving it alone is what
+      // lets someone click a different row's "Change", or "Done", instead of
+      // pressing Escape to get out of a capture they no longer want.
+      if (event.button === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      tryBind(`Mouse${event.button}`, event.shiftKey, event.metaKey, event.ctrlKey, event.altKey);
+    };
+
+    // A right-click's menu is a separate event from `mousedown`, dispatched
+    // regardless of what that mousedown did — left open, it would bury the
+    // capture prompt under the browser's own context menu.
+    const onContextMenu = (event: Event) => event.preventDefault();
+
     document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
+    document.addEventListener('mousedown', onMouseDown, true);
+    document.addEventListener('contextmenu', onContextMenu, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('mousedown', onMouseDown, true);
+      document.removeEventListener('contextmenu', onContextMenu, true);
+    };
   }, [capturing, keymap, onChange]);
 
   const assign = (id: CommandId) => {
@@ -121,13 +151,13 @@ export function ShortcutEditor({
       }
     >
       <p className="field__hint shortcut-editor__intro">
-        Press <strong>Change</strong>, then press the key you want. Hold Shift while you press it
-        for a Shift shortcut. These are saved in this browser, for you.
+        Press <strong>Change</strong>, then press the key or click the mouse button you want. Hold
+        Shift while you do it for a Shift shortcut. These are saved in this browser, for you.
       </p>
 
       {capturing ? (
         <p className="shortcut-editor__prompt" role="status">
-          Press a key for “{commandLabel(capturing)}” — Escape to cancel.
+          Press a key or click a mouse button for “{commandLabel(capturing)}” — Escape to cancel.
         </p>
       ) : null}
 

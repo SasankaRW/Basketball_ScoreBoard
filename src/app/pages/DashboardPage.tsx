@@ -449,7 +449,7 @@ function AuditSection({ tenantId }: { tenantId: string }) {
   const shown = expanded ? events : events.slice(0, 8);
 
   return (
-    <section className="section">
+    <section className="section" data-tour="audit">
       <div className="section__head">
         <h2>Match activity</h2>
         {events.length > 8 ? (

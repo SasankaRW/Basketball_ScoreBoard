@@ -19,10 +19,16 @@
  * shift state stays a separate flag instead of being folded into the character:
  * `Shift+R` and `R` are two different bindings that can drive two different
  * commands, which is exactly what the shot-clock's 24/14 pair needs.
+ *
+ * A mouse button binds the same way: it is encoded as a synthetic `MouseN`
+ * code (`N` is `MouseEvent.button`), so it round-trips through this same
+ * `code`/`shift` shape without a parallel type. `Mouse0` — the plain left
+ * click every button on this page is pressed with — is never bindable; see
+ * `isBindableCode`.
  */
 
 export interface KeyBinding {
-  /** `KeyboardEvent.code`, e.g. `KeyR`, `ArrowUp`, `Space`. */
+  /** `KeyboardEvent.code` (e.g. `KeyR`, `ArrowUp`) or a synthetic `MouseN` id. */
   code: string;
   shift: boolean;
 }
@@ -212,7 +218,18 @@ const MODIFIER_CODES = new Set([
   'NumLock',
 ]);
 
-const UNBINDABLE = new Set([...MODIFIER_CODES, 'Escape', 'Tab', 'ContextMenu', 'F5', 'F11', 'F12']);
+const UNBINDABLE = new Set([
+  ...MODIFIER_CODES,
+  'Escape',
+  'Tab',
+  'ContextMenu',
+  'F5',
+  'F11',
+  'F12',
+  // The plain left click, reserved for pressing the buttons on this page —
+  // every other mouse button is fair game.
+  'Mouse0',
+]);
 
 /**
  * A modifier pressed on its own.
@@ -383,6 +400,11 @@ const CODE_LABELS: Record<string, string> = {
   NumpadMultiply: 'Num *',
   NumpadDivide: 'Num /',
   NumpadDecimal: 'Num .',
+  Mouse0: 'Left click',
+  Mouse1: 'Middle click',
+  Mouse2: 'Right click',
+  Mouse3: 'Back button',
+  Mouse4: 'Forward button',
 };
 
 export function formatCode(code: string): string {

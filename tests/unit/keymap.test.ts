@@ -164,7 +164,7 @@ describe('binding a key', () => {
 });
 
 describe('bindable keys', () => {
-  it.each(['Escape', 'Tab', 'ShiftLeft', 'ControlRight', 'MetaLeft', 'F5', 'F11', 'F12'])(
+  it.each(['Escape', 'Tab', 'ShiftLeft', 'ControlRight', 'MetaLeft', 'F5', 'F11', 'F12', 'Mouse0'])(
     'refuses %s',
     (code) => {
       expect(isBindableCode(code)).toBe(false);
@@ -177,6 +177,23 @@ describe('bindable keys', () => {
       expect(isBindableCode(code)).toBe(true);
     },
   );
+
+  /**
+   * Mouse buttons bind through the same `code` string as a key — `Mouse0` (the
+   * plain left click every button on the page is pressed with) is the one
+   * exception, refused so a bound shortcut can never fire on an ordinary click.
+   */
+  it.each(['Mouse1', 'Mouse2', 'Mouse3', 'Mouse4'])('accepts mouse button %s', (code) => {
+    expect(isBindableCode(code)).toBe(true);
+  });
+
+  it('binds and looks up a mouse button like any other code', () => {
+    const { keymap } = withBinding(defaultKeymap(), 'possession.toggle', {
+      code: 'Mouse2',
+      shift: false,
+    });
+    expect(commandForKey(keymap, 'Mouse2', false)).toBe('possession.toggle');
+  });
 
   /**
    * `Shift+R` arrives as ShiftLeft and then KeyR, so the editor has to wait
@@ -264,6 +281,10 @@ describe('display', () => {
     ['Slash', '/'],
     ['Numpad7', 'Num 7'],
     ['F2', 'F2'],
+    ['Mouse1', 'Middle click'],
+    ['Mouse2', 'Right click'],
+    ['Mouse3', 'Back button'],
+    ['Mouse4', 'Forward button'],
   ])('renders %s as %s', (code, expected) => {
     expect(formatCode(code)).toBe(expected);
   });

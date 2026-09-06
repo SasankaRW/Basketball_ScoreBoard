@@ -22,6 +22,16 @@ async function openControlPanel(page: import('@playwright/test').Page, board: st
   await expect(page.locator(homeScore).first()).toHaveText('00');
 }
 
+/**
+ * The editor lives behind the "Keyboard shortcuts" reference popup rather
+ * than being reachable directly from the sidebar, so every test opens the
+ * popup before it can reach "Customise shortcuts".
+ */
+async function openShortcutEditor(page: import('@playwright/test').Page): Promise<void> {
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+}
+
 /** Arms a row in the editor and presses the key that should take it over. */
 async function rebind(
   page: import('@playwright/test').Page,
@@ -29,7 +39,9 @@ async function rebind(
   key: string,
 ): Promise<void> {
   await page.getByRole('button', { name: `Change shortcut for ${command}` }).click();
-  await expect(page.getByText(`Press a key for “${command}”`)).toBeVisible();
+  await expect(
+    page.getByText(`Press a key or click a mouse button for “${command}”`),
+  ).toBeVisible();
   await page.keyboard.press(key);
 }
 
@@ -41,7 +53,7 @@ test('a remapped key scores, and the key it replaced stops scoring', async ({ pa
   await page.keyboard.press('ArrowUp');
   await expect(page.locator(homeScore).first()).toHaveText('01');
 
-  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+  await openShortcutEditor(page);
   await rebind(page, 'Home +1', 'p');
   await expect(page.getByLabel('Change shortcut for Home +1')).toBeVisible();
   await page.getByRole('button', { name: 'Done' }).click();
@@ -50,20 +62,21 @@ test('a remapped key scores, and the key it replaced stops scoring', async ({ pa
   await page.keyboard.press('p');
   await expect(page.locator(homeScore).first()).toHaveText('02');
 
-  // …and the old one is genuinely unbound, not merely absent from the card.
+  // …and the old one is genuinely unbound, not merely absent from the reference.
   await page.keyboard.press('ArrowUp');
   await page.waitForTimeout(300);
   await expect(page.locator(homeScore).first()).toHaveText('02');
 
-  // The reference card reads from the keymap, so it has to have followed.
-  await expect(page.locator('[data-tour="shortcuts"]')).toContainText('P');
+  // The reference popup reads from the keymap, so it has to have followed.
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toContainText('P');
 });
 
 test('a customised shortcut survives a reload', async ({ page }) => {
   await signUp(page, freshAccount('keys-persist'));
   await openControlPanel(page, 'Persist Court');
 
-  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+  await openShortcutEditor(page);
   await rebind(page, 'Home +1', 'p');
   await page.getByRole('button', { name: 'Done' }).click();
 
@@ -83,7 +96,7 @@ test('taking a key that is already in use reports what it was taken from', async
   await signUp(page, freshAccount('keys-conflict'));
   await openControlPanel(page, 'Conflict Court');
 
-  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+  await openShortcutEditor(page);
   await rebind(page, 'Home +2', 'ArrowUp');
 
   await expect(page.getByText(/was on “Home \+1”, which now has no shortcut/)).toBeVisible();
@@ -100,14 +113,14 @@ test('Escape cancels a capture without binding anything or closing the editor', 
   await signUp(page, freshAccount('keys-escape'));
   await openControlPanel(page, 'Escape Court');
 
-  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+  await openShortcutEditor(page);
   await page.getByRole('button', { name: 'Change shortcut for Home +1' }).click();
-  await expect(page.getByText('Press a key for “Home +1”')).toBeVisible();
+  await expect(page.getByText('Press a key or click a mouse button for “Home +1”')).toBeVisible();
 
   await page.keyboard.press('Escape');
   // The prompt is gone but the editor is not — Escape belongs to the capture
   // while one is armed, and only then.
-  await expect(page.getByText('Press a key for “Home +1”')).toBeHidden();
+  await expect(page.getByText('Press a key or click a mouse button for “Home +1”')).toBeHidden();
   await expect(page.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Done' }).click();
@@ -121,7 +134,7 @@ test('clearing a shortcut leaves the control with no key, and reset restores it'
   await signUp(page, freshAccount('keys-clear'));
   await openControlPanel(page, 'Clear Court');
 
-  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+  await openShortcutEditor(page);
   await page.getByRole('button', { name: 'Clear shortcut for Home +1' }).click();
   await page.getByRole('button', { name: 'Done' }).click();
 
@@ -129,7 +142,7 @@ test('clearing a shortcut leaves the control with no key, and reset restores it'
   await page.waitForTimeout(300);
   await expect(page.locator(homeScore).first()).toHaveText('00');
 
-  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+  await openShortcutEditor(page);
   await page.getByRole('button', { name: 'Reset to defaults' }).click();
   await page.getByRole('button', { name: 'Done' }).click();
 
@@ -146,7 +159,7 @@ test('keys pressed while the editor is open do not reach the game', async ({ pag
   await signUp(page, freshAccount('keys-shield'));
   await openControlPanel(page, 'Shield Court');
 
-  await page.getByRole('button', { name: 'Customise shortcuts' }).click();
+  await openShortcutEditor(page);
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('f');
   await page.waitForTimeout(300);

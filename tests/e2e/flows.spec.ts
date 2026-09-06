@@ -118,6 +118,10 @@ test('the control panel hands out single-clock screens that run off the live boa
   await setTimeDialog.getByRole('button', { name: 'Set time' }).click();
   await expect(page.locator('.clock-console__game')).toHaveText('07:30');
 
+  // The links are behind a disclosure, collapsed by default to keep the
+  // sidebar short.
+  await page.getByRole('button', { name: 'Clock screens' }).click();
+
   const gameClockUrl = await copyFieldValue(page, `gameclock-${page.url().split('/').pop()}`);
   const shotClockUrl = await copyFieldValue(page, `shotclock-${page.url().split('/').pop()}`);
 

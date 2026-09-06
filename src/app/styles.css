@@ -1048,8 +1048,32 @@ textarea:focus {
   align-self: center;
 }
 
-.shortcut-card__title {
-  margin-bottom: 0.6rem;
+/* A card whose body only exists once its header is pressed — used where the
+   content is useful but bulky, like the clock-screen links, so the sidebar
+   does not carry their full height on every render. */
+.disclosure-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.disclosure-toggle__label {
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+.disclosure-toggle__body {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-hairline);
 }
 
 .match-result {
@@ -1071,10 +1095,6 @@ textarea:focus {
   gap: var(--space-3);
   padding: 0.3rem 0;
   color: var(--text-muted);
-}
-.shortcut-card__edit {
-  margin-top: var(--space-3);
-  width: 100%;
 }
 
 .shortcut-list kbd {

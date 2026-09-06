@@ -349,7 +349,7 @@ export function BoardSettingsPage() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section" data-tour="danger-zone">
         <div className="section__head">
           <h2>Danger zone</h2>
         </div>

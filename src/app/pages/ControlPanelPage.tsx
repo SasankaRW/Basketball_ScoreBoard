@@ -50,7 +50,7 @@ import {
 import { ensureStorageClient } from '../../core/storageClient.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
-import { IconExternalLink } from '../components/icons.js';
+import { IconChevronDown, IconChevronUp, IconExternalLink } from '../components/icons.js';
 import { ShortcutEditor } from '../components/ShortcutEditor.js';
 import { Alert, CopyField, Field, Modal, Spinner } from '../components/ui.js';
 import { useTour } from '../tour/TourProvider.js';
@@ -76,6 +76,7 @@ export function ControlPanelPage() {
   const [editingTime, setEditingTime] = useState(false);
   const [editingNames, setEditingNames] = useState(false);
   const [editingShortcuts, setEditingShortcuts] = useState(false);
+  const [viewingShortcuts, setViewingShortcuts] = useState(false);
 
   /**
    * The operator's own shortcuts, read once per signed-in user.
@@ -271,19 +272,29 @@ export function ControlPanelPage() {
     };
   }, [dispatch, state, board, handleFinish]);
 
-  // Keyboard shortcuts, resolved through the operator's keymap rather than a
-  // fixed switch. Suppressed while a text field has focus, while the shortcut
-  // editor is capturing a key, and while the guided tour is open — the tour
-  // steps through with the arrow keys, which are also this page's default score
+  // Any dialog stacked over the board. Shortcuts — mouse ones especially, since
+  // there is no "focused text field" to shield a click the way there is for a
+  // keypress — must not reach the game underneath one of these.
+  const modalOpen =
+    editingTime || editingNames || editingShortcuts || viewingShortcuts || Boolean(finishResult);
+
+  // Keyboard and mouse-button shortcuts, resolved through the operator's keymap
+  // rather than a fixed switch. Suppressed while a text field has focus, while
+  // any modal above is open, and while the guided tour is open — the tour steps
+  // through with the arrow keys, which are also this page's default score
   // shortcuts, so leaving both live would quietly add points to a game while
   // explaining how to add points to a game.
   useEffect(() => {
-    if (readOnly || !state || tourRunning || editingShortcuts) return;
+    if (readOnly || !state || tourRunning || modalOpen) return;
+
+    const isTextField = (target: EventTarget | null) => {
+      const element = target as HTMLElement | null;
+      return !!element && /^(INPUT|SELECT|TEXTAREA)$/.test(element.tagName);
+    };
 
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
+      if (isTextField(event.target)) return;
 
       const command = commandForKey(keymap, event.code, event.shiftKey);
       if (!command) return;
@@ -292,9 +303,33 @@ export function ControlPanelPage() {
       event.preventDefault();
     };
 
+    const onMouseDown = (event: MouseEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.button === 0 || isTextField(event.target)) return;
+
+      const command = commandForKey(keymap, `Mouse${event.button}`, event.shiftKey);
+      if (!command) return;
+
+      commands[command]();
+      event.preventDefault();
+    };
+
+    // `contextmenu` fires independently of `mousedown` — the browser still
+    // opens its menu after a bound right-click unless this says not to.
+    const onContextMenu = (event: MouseEvent) => {
+      if (isTextField(event.target)) return;
+      if (commandForKey(keymap, 'Mouse2', event.shiftKey)) event.preventDefault();
+    };
+
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [commands, keymap, readOnly, state, tourRunning, editingShortcuts]);
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('contextmenu', onContextMenu);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('contextmenu', onContextMenu);
+    };
+  }, [commands, keymap, readOnly, state, tourRunning, modalOpen]);
 
   if (!boardId) return <Alert kind="error">No board specified.</Alert>;
   if (board === undefined || (!loaded && !error)) return <Spinner label="Opening board…" />;
@@ -407,7 +442,14 @@ export function ControlPanelPage() {
             {canManageBoards(session.role) ? (
               <ClockScreensCard tenantId={session.tenantId} boardId={boardId} />
             ) : null}
-            <ShortcutCard keymap={keymap} onCustomise={() => setEditingShortcuts(true)} />
+            <button
+              type="button"
+              className="btn btn--block"
+              data-tour="shortcuts"
+              onClick={() => setViewingShortcuts(true)}
+            >
+              Keyboard shortcuts
+            </button>
           </aside>
         </div>
       )}
@@ -433,6 +475,17 @@ export function ControlPanelPage() {
             dispatch({ type: 'TEAM_NAME_SET', side: 'away', name: away });
             setEditingNames(false);
           }}
+        />
+      ) : null}
+
+      {viewingShortcuts ? (
+        <ShortcutReferenceModal
+          keymap={keymap}
+          onCustomise={() => {
+            setViewingShortcuts(false);
+            setEditingShortcuts(true);
+          }}
+          onClose={() => setViewingShortcuts(false)}
         />
       ) : null}
 
@@ -887,6 +940,7 @@ function LogoCard({
 function ClockScreensCard({ tenantId, boardId }: { tenantId: string; boardId: string }) {
   const firestore = getFirestoreClient();
   const [keys, setKeys] = useState<ViewerKeys>({ overlayKey: null, mirrorKey: null });
+  const [expanded, setExpanded] = useState(false);
   const origin = window.location.origin;
 
   useEffect(
@@ -912,45 +966,75 @@ function ClockScreensCard({ tenantId, boardId }: { tenantId: string; boardId: st
     : [];
 
   return (
-    <div className="card stack">
-      <h3 className="shortcut-card__title">Clock screens</h3>
-      {screens.length === 0 ? (
-        <span className="muted">Loading…</span>
-      ) : (
-        screens.map(({ slug, name, hint, url }) => (
-          <div key={slug}>
-            <div className="field__hint board-card__hint">{hint}</div>
-            <CopyField label={`${slug}-${boardId}`} value={url} />
-            <a className="btn btn--ghost btn--sm" href={url} target="_blank" rel="noopener">
-              Open {name}
-              <IconExternalLink size={13} />
-            </a>
+    <div className="card" data-tour="clock-screens">
+      <button
+        type="button"
+        className="disclosure-toggle"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        <span className="disclosure-toggle__label">Clock screens</span>
+        {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+      </button>
+
+      {expanded ? (
+        <div className="disclosure-toggle__body stack">
+          {screens.length === 0 ? (
+            <span className="muted">Loading…</span>
+          ) : (
+            screens.map(({ slug, name, hint, url }) => (
+              <div key={slug}>
+                <div className="field__hint board-card__hint">{hint}</div>
+                <CopyField label={`${slug}-${boardId}`} value={url} />
+                <a className="btn btn--ghost btn--sm" href={url} target="_blank" rel="noopener">
+                  Open {name}
+                  <IconExternalLink size={13} />
+                </a>
+              </div>
+            ))
+          )}
+          <div className="field__hint">
+            Read-only, and no sign-in needed. Both use this board&rsquo;s mirror key — rotating the
+            mirror link in Settings revokes these too.
           </div>
-        ))
-      )}
-      <div className="field__hint">
-        Read-only, and no sign-in needed. Both use this board&rsquo;s mirror key — rotating the
-        mirror link in Settings revokes these too.
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 /**
- * The live shortcut reference.
+ * The live shortcut reference, opened from the sidebar's "Keyboard shortcuts"
+ * button rather than pinned there permanently — the full list only matters
+ * when someone is actually looking something up.
  *
  * Rendered from the operator's actual keymap rather than a hand-written list,
- * which is the point of the exercise: a card that still advertised `↑` after
- * someone moved scoring elsewhere would be worse than no card at all. Only
+ * which is the point of the exercise: a list that still advertised `↑` after
+ * someone moved scoring elsewhere would be worse than no list at all. Only
  * bound commands appear — the unbound ones are in the editor, where they can be
- * given a key.
+ * given a key. "Customise shortcuts" hands off to that editor directly.
  */
-function ShortcutCard({ keymap, onCustomise }: { keymap: Keymap; onCustomise: () => void }) {
+function ShortcutReferenceModal({
+  keymap,
+  onCustomise,
+  onClose,
+}: {
+  keymap: Keymap;
+  onCustomise: () => void;
+  onClose: () => void;
+}) {
   const bound = COMMANDS.filter((command) => keymap[command.id]);
 
   return (
-    <div className="card" data-tour="shortcuts">
-      <h3 className="shortcut-card__title">Keyboard</h3>
+    <Modal
+      title="Keyboard shortcuts"
+      onClose={onClose}
+      footer={
+        <button type="button" className="btn btn--primary" onClick={onCustomise}>
+          Customise shortcuts
+        </button>
+      }
+    >
       {bound.length === 0 ? (
         <p className="field__hint">No shortcuts are set.</p>
       ) : (
@@ -963,10 +1047,7 @@ function ShortcutCard({ keymap, onCustomise }: { keymap: Keymap; onCustomise: ()
           ))}
         </ul>
       )}
-      <button type="button" className="btn btn--sm shortcut-card__edit" onClick={onCustomise}>
-        Customise shortcuts
-      </button>
-    </div>
+    </Modal>
   );
 }
 
