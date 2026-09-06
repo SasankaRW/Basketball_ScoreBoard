@@ -1072,6 +1072,11 @@ textarea:focus {
   padding: 0.3rem 0;
   color: var(--text-muted);
 }
+.shortcut-card__edit {
+  margin-top: var(--space-3);
+  width: 100%;
+}
+
 .shortcut-list kbd {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   background: var(--surface-raised);
@@ -1084,6 +1089,121 @@ textarea:focus {
   color: var(--text);
   min-width: 5.5rem;
   text-align: center;
+}
+
+/* ------------------------------------------------------- shortcut editor */
+
+.shortcut-editor__intro {
+  margin-bottom: var(--space-4);
+}
+
+/*
+ * Both banners stick to the top of the modal's scroll area.
+ *
+ * The command list is long enough to scroll, and the row being edited is
+ * usually well down it — a banner that stayed at the top of the document would
+ * announce "press a key" and "that key was taken from Home +1" to an empty
+ * part of the screen, which is the same as not announcing them.
+ *
+ * `.modal-card` is the scroll container, and its 1.4rem of padding sits above
+ * the sticky edge; the shadow paints that strip in the card's own colour so
+ * rows scroll behind the banner rather than through the gap over it.
+ */
+.shortcut-editor__prompt,
+.shortcut-editor__notice {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin-bottom: var(--space-4);
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  box-shadow: 0 -1.4rem 0 var(--surface-overlay);
+}
+.shortcut-editor__prompt {
+  border: 1px solid var(--blue);
+  background: var(--blue-bg);
+  color: var(--text);
+}
+.shortcut-editor__notice {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}
+
+.shortcut-editor__group {
+  margin-bottom: var(--space-4);
+}
+.shortcut-editor__group-title {
+  margin: 0 0 var(--space-2);
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.shortcut-editor__row {
+  display: grid;
+  /* label | key | Change | Clear | changed-dot */
+  grid-template-columns: minmax(0, 1fr) auto auto auto 0.6rem;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.25rem 0;
+}
+.shortcut-editor__label {
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+.shortcut-editor__key {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  /* Wide enough for "Press a key…", so arming a row does not reflow the list. */
+  min-width: 7.2rem;
+  text-align: center;
+}
+.shortcut-editor__key--unset {
+  color: var(--text-muted);
+  border-style: dashed;
+  border-bottom-width: 1px;
+}
+.shortcut-editor__key--armed {
+  border-color: var(--blue);
+  border-style: solid;
+  color: var(--blue-bright);
+}
+
+/* Marks a row that no longer matches the shipped default. */
+.shortcut-editor__changed {
+  color: var(--blue);
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+}
+
+/*
+ * Narrow screens put the label on its own line above the controls: a courtside
+ * tablet cannot fit "Reset shot clock (offensive rebound)" beside a key chip
+ * and two buttons without crushing one of them.
+ */
+@media (max-width: 560px) {
+  .shortcut-editor__row {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 0.4rem 0;
+  }
+  .shortcut-editor__label {
+    flex: 1 0 100%;
+  }
+  .shortcut-editor__changed {
+    display: none;
+  }
 }
 
 .status-strip {

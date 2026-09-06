@@ -9,7 +9,7 @@
  * The buttons are deliberately oversized. This gets driven courtside, at speed,
  * by someone whose attention is mostly on the court.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { createBuzzerElements, createBuzzers } from '../../core/buzzer.js';
 import { formatGameClock, formatShotClock, remainingAt } from '../../core/clock.js';
@@ -25,6 +25,15 @@ import {
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { finishMatch } from '../../core/matches.js';
 import { canControlBoard, canManageBoards } from '../../core/roles.js';
+import {
+  commandForKey,
+  COMMANDS,
+  defaultKeymap,
+  formatBinding,
+  type CommandId,
+  type Keymap,
+} from '../../core/keymap.js';
+import { clearKeymap, readKeymap, writeKeymap } from '../keymapStorage.js';
 import {
   isInBonus,
   LIMITS,
@@ -42,6 +51,7 @@ import { ensureStorageClient } from '../../core/storageClient.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconExternalLink } from '../components/icons.js';
+import { ShortcutEditor } from '../components/ShortcutEditor.js';
 import { Alert, CopyField, Field, Modal, Spinner } from '../components/ui.js';
 import { useTour } from '../tour/TourProvider.js';
 import { useBoard, useBoardState, useDispatch, useNow } from '../hooks.js';
@@ -65,6 +75,32 @@ export function ControlPanelPage() {
 
   const [editingTime, setEditingTime] = useState(false);
   const [editingNames, setEditingNames] = useState(false);
+  const [editingShortcuts, setEditingShortcuts] = useState(false);
+
+  /**
+   * The operator's own shortcuts, read once per signed-in user.
+   *
+   * Seeded lazily so a blocked or empty `localStorage` costs nothing on every
+   * later render, and keyed by uid inside the store — a shared courtside laptop
+   * must not hand one scorer's layout to the next person who signs in.
+   */
+  const [keymap, setKeymap] = useState<Keymap>(() => readKeymap(session.uid));
+
+  useEffect(() => setKeymap(readKeymap(session.uid)), [session.uid]);
+
+  const changeKeymap = useCallback(
+    (next: Keymap) => {
+      setKeymap(next);
+      writeKeymap(session.uid, next);
+    },
+    [session.uid],
+  );
+
+  const resetKeymap = useCallback(() => {
+    setKeymap(defaultKeymap());
+    clearKeymap(session.uid);
+  }, [session.uid]);
+
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
   const [finishResult, setFinishResult] = useState<{
@@ -81,7 +117,7 @@ export function ControlPanelPage() {
    * reading `state` after the await would show the fresh 0-0 board, not the
    * result being announced.
    */
-  async function handleFinish() {
+  const handleFinish = useCallback(async () => {
     if (!state || !boardId) return;
     if (
       !confirm(
@@ -106,7 +142,7 @@ export function ControlPanelPage() {
     } finally {
       setFinishing(false);
     }
-  }
+  }, [state, boardId]);
 
   /**
    * Buzzers here as well as on the scoreboard.
@@ -157,72 +193,108 @@ export function ControlPanelPage() {
     shotWasRunning.current = state.shotClock.running && shotRemaining > 0;
   }, [state, now, buzzers]);
 
-  // Keyboard parity with the scoreboard, so muscle memory carries between the
-  // two surfaces. Suppressed while a text field has focus, and while the guided
-  // tour is open — the tour steps through with the arrow keys, which are also
-  // this page's score shortcuts, so leaving both live would quietly add points
-  // to a game while explaining how to add points to a game.
+  /**
+   * What every bindable control actually does.
+   *
+   * The panel used to switch straight from a key to a dispatch, which made the
+   * key the identity of the action. Naming the commands separates the two, so
+   * `src/core/keymap.ts` can decide *which* command a keypress reaches while
+   * this stays the single definition of what each one does.
+   *
+   * Each entry does exactly what its button does, confirmations included — a
+   * shortcut that skipped the "start the next period?" prompt would be a
+   * different, more dangerous control wearing the same name.
+   */
+  const commands = useMemo<Record<CommandId, () => void>>(() => {
+    const score = (side: Side, delta: number) => () =>
+      dispatch({ type: 'SCORE_ADJUST', side, delta });
+    const foul = (side: Side, delta: number) => () =>
+      dispatch({ type: 'FOUL_ADJUST', side, delta });
+    const timeout = (side: Side, delta: number) => () =>
+      dispatch({ type: 'TIMEOUT_ADJUST', side, delta });
+
+    return {
+      'gameClock.toggle': () => dispatch({ type: 'GAME_CLOCK_TOGGLE' }),
+      'gameClock.set': () => setEditingTime(true),
+      'gameClock.reset': () => dispatch({ type: 'GAME_CLOCK_RESET' }),
+      'shotClock.toggle': () => dispatch({ type: 'SHOT_CLOCK_TOGGLE' }),
+      'shotClock.reset': () => dispatch({ type: 'SHOT_CLOCK_RESET' }),
+      'shotClock.resetShort': () =>
+        dispatch({
+          type: 'SHOT_CLOCK_RESET',
+          ...(state ? { remainingMs: state.config.shotClockResetMs } : {}),
+        }),
+
+      'score.home.plus1': score('home', 1),
+      'score.home.plus2': score('home', 2),
+      'score.home.plus3': score('home', 3),
+      'score.home.minus1': score('home', -1),
+      'score.away.plus1': score('away', 1),
+      'score.away.plus2': score('away', 2),
+      'score.away.plus3': score('away', 3),
+      'score.away.minus1': score('away', -1),
+
+      'foul.home.plus': foul('home', 1),
+      'foul.home.minus': foul('home', -1),
+      'foul.away.plus': foul('away', 1),
+      'foul.away.minus': foul('away', -1),
+
+      'timeout.home.use': timeout('home', -1),
+      'timeout.home.restore': timeout('home', 1),
+      'timeout.away.use': timeout('away', -1),
+      'timeout.away.restore': timeout('away', 1),
+
+      'period.plus': () => dispatch({ type: 'PERIOD_ADJUST', delta: 1 }),
+      'period.minus': () => dispatch({ type: 'PERIOD_ADJUST', delta: -1 }),
+      'period.next': () => {
+        if (confirm('Start the next period? Team fouls reset and both clocks return to full.')) {
+          dispatch({ type: 'NEXT_PERIOD' });
+        }
+      },
+
+      'possession.toggle': () => dispatch({ type: 'POSSESSION_TOGGLE' }),
+      'possession.home': () => dispatch({ type: 'POSSESSION_SET', side: 'home' }),
+      'possession.away': () => dispatch({ type: 'POSSESSION_SET', side: 'away' }),
+
+      'teamNames.edit': () => setEditingNames(true),
+      'match.finish': () => void handleFinish(),
+      'game.new': () => {
+        if (
+          board &&
+          confirm(
+            'Start a new game without saving history? Score, fouls and clocks will all be cleared and this game will NOT appear in match history. Use "Finish match" instead if you want to keep a record of it.',
+          )
+        ) {
+          dispatch({ type: 'NEW_GAME', config: board.config });
+        }
+      },
+    };
+  }, [dispatch, state, board, handleFinish]);
+
+  // Keyboard shortcuts, resolved through the operator's keymap rather than a
+  // fixed switch. Suppressed while a text field has focus, while the shortcut
+  // editor is capturing a key, and while the guided tour is open — the tour
+  // steps through with the arrow keys, which are also this page's default score
+  // shortcuts, so leaving both live would quietly add points to a game while
+  // explaining how to add points to a game.
   useEffect(() => {
-    if (readOnly || !state || tourRunning) return;
+    if (readOnly || !state || tourRunning || editingShortcuts) return;
 
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
 
-      const shift = event.shiftKey;
-      switch (event.code) {
-        case 'KeyT':
-          dispatch({ type: 'GAME_CLOCK_TOGGLE' });
-          break;
-        case 'Space':
-          dispatch({ type: 'SHOT_CLOCK_TOGGLE' });
-          break;
-        case 'KeyR':
-          dispatch({
-            type: 'SHOT_CLOCK_RESET',
-            ...(shift ? { remainingMs: state.config.shotClockResetMs } : {}),
-          });
-          break;
-        case 'ArrowUp':
-          dispatch({ type: 'SCORE_ADJUST', side: 'home', delta: 1 });
-          break;
-        case 'ArrowDown':
-          dispatch({ type: 'SCORE_ADJUST', side: 'home', delta: -1 });
-          break;
-        case 'ArrowRight':
-          dispatch({ type: 'SCORE_ADJUST', side: 'away', delta: 1 });
-          break;
-        case 'ArrowLeft':
-          dispatch({ type: 'SCORE_ADJUST', side: 'away', delta: -1 });
-          break;
-        case 'KeyF':
-          dispatch({ type: 'FOUL_ADJUST', side: 'home', delta: shift ? -1 : 1 });
-          break;
-        case 'KeyJ':
-          dispatch({ type: 'FOUL_ADJUST', side: 'away', delta: shift ? -1 : 1 });
-          break;
-        case 'KeyZ':
-          dispatch({ type: 'TIMEOUT_ADJUST', side: 'home', delta: shift ? 1 : -1 });
-          break;
-        case 'KeyX':
-          dispatch({ type: 'TIMEOUT_ADJUST', side: 'away', delta: shift ? 1 : -1 });
-          break;
-        case 'KeyQ':
-          dispatch({ type: 'PERIOD_ADJUST', delta: shift ? -1 : 1 });
-          break;
-        case 'KeyB':
-          dispatch({ type: 'POSSESSION_TOGGLE' });
-          break;
-        default:
-          return;
-      }
+      const command = commandForKey(keymap, event.code, event.shiftKey);
+      if (!command) return;
+
+      commands[command]();
       event.preventDefault();
     };
 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [dispatch, readOnly, state, tourRunning]);
+  }, [commands, keymap, readOnly, state, tourRunning, editingShortcuts]);
 
   if (!boardId) return <Alert kind="error">No board specified.</Alert>;
   if (board === undefined || (!loaded && !error)) return <Spinner label="Opening board…" />;
@@ -335,7 +407,7 @@ export function ControlPanelPage() {
             {canManageBoards(session.role) ? (
               <ClockScreensCard tenantId={session.tenantId} boardId={boardId} />
             ) : null}
-            <ShortcutCard />
+            <ShortcutCard keymap={keymap} onCustomise={() => setEditingShortcuts(true)} />
           </aside>
         </div>
       )}
@@ -361,6 +433,15 @@ export function ControlPanelPage() {
             dispatch({ type: 'TEAM_NAME_SET', side: 'away', name: away });
             setEditingNames(false);
           }}
+        />
+      ) : null}
+
+      {editingShortcuts ? (
+        <ShortcutEditor
+          keymap={keymap}
+          onChange={changeKeymap}
+          onReset={resetKeymap}
+          onClose={() => setEditingShortcuts(false)}
         />
       ) : null}
 
@@ -855,31 +936,36 @@ function ClockScreensCard({ tenantId, boardId }: { tenantId: string; boardId: st
   );
 }
 
-function ShortcutCard() {
-  const shortcuts: [string, string][] = [
-    ['T', 'Start / stop game clock'],
-    ['Space', 'Start / stop shot clock'],
-    ['R / Shift+R', 'Reset shot clock (24 / 14)'],
-    ['↑ / ↓', 'Home score ±1'],
-    ['→ / ←', 'Away score ±1'],
-    ['F / Shift+F', 'Home fouls ±1'],
-    ['J / Shift+J', 'Away fouls ±1'],
-    ['Z / X', 'Use home / away timeout'],
-    ['Q / Shift+Q', 'Period ±1'],
-    ['B', 'Toggle possession'],
-  ];
+/**
+ * The live shortcut reference.
+ *
+ * Rendered from the operator's actual keymap rather than a hand-written list,
+ * which is the point of the exercise: a card that still advertised `↑` after
+ * someone moved scoring elsewhere would be worse than no card at all. Only
+ * bound commands appear — the unbound ones are in the editor, where they can be
+ * given a key.
+ */
+function ShortcutCard({ keymap, onCustomise }: { keymap: Keymap; onCustomise: () => void }) {
+  const bound = COMMANDS.filter((command) => keymap[command.id]);
 
   return (
     <div className="card" data-tour="shortcuts">
       <h3 className="shortcut-card__title">Keyboard</h3>
-      <ul className="shortcut-list">
-        {shortcuts.map(([key, description]) => (
-          <li key={key}>
-            <kbd>{key}</kbd>
-            <span>{description}</span>
-          </li>
-        ))}
-      </ul>
+      {bound.length === 0 ? (
+        <p className="field__hint">No shortcuts are set.</p>
+      ) : (
+        <ul className="shortcut-list">
+          {bound.map((command) => (
+            <li key={command.id}>
+              <kbd>{formatBinding(keymap[command.id])}</kbd>
+              <span>{command.label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" className="btn btn--sm shortcut-card__edit" onClick={onCustomise}>
+        Customise shortcuts
+      </button>
     </div>
   );
 }

@@ -78,6 +78,18 @@ evaluate, so UI and backend can never disagree about who someone is.
 `src/server/common.ts`'s `requireRole()` calls `verifyIdToken()` itself, since
 plain HTTP functions get no equivalent of the callable-functions handshake.
 
+**Control-panel shortcuts are data, not a `switch`.** `src/core/keymap.ts` owns
+the command catalog (`score.home.plus1`, …), the shipped defaults, and the
+conflict rules; `ControlPanelPage` maps each command to what its button does,
+and `src/app/keymapStorage.ts` persists an operator's edits to `localStorage`
+per uid — like `tour/progress.ts`, and for the same reasons (a property of this
+browser, no security-rules surface). One key drives exactly one command, so
+assigning a key that is in use _takes_ it and the editor says which command lost
+it. Two consequences worth knowing: matching is exact on `code` + `shift`, so
+`Shift+↑` no longer falls through to `↑` the way the old switch let it; and the
+scoreboard display (`src/display/scoreboard/main.ts`) still has its own
+hard-coded keys, so a remapped panel and the gym-wall board no longer agree.
+
 **Display surfaces are deliberately minimal.** `src/display/` is vanilla
 TypeScript — no React, no Firestore — because a gym-wall screen and an OBS
 Browser Source should load only what they need. `src/core/firebase.ts` keeps

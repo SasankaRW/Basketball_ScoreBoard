@@ -126,7 +126,7 @@ export const CONTROL_TOUR: TourDefinition = {
     {
       anchor: '[data-tour="shortcuts"]',
       title: 'Keyboard shortcuts',
-      body: 'Every common action has a key. They are the fastest way to score courtside, and they work the same on the scoreboard display itself.',
+      body: 'Every common action has a key, and they are the fastest way to score courtside. "Customise shortcuts" remaps any of them to whatever your fingers already know — saved in this browser, for you.',
       placement: 'left',
     },
     helpStep,
