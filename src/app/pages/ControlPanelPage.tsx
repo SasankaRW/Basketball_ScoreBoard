@@ -13,7 +13,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { createBuzzerElements, createBuzzers } from '../../core/buzzer.js';
 import { formatGameClock, formatShotClock, remainingAt } from '../../core/clock.js';
-import { buildScoreboardUrl, updateBoard, type Board } from '../../core/boards.js';
+import {
+  buildGameClockUrl,
+  buildScoreboardUrl,
+  buildShotClockUrl,
+  subscribeViewerKeys,
+  updateBoard,
+  type Board,
+  type ViewerKeys,
+} from '../../core/boards.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { finishMatch } from '../../core/matches.js';
 import { canControlBoard, canManageBoards } from '../../core/roles.js';
@@ -34,7 +42,7 @@ import { ensureStorageClient } from '../../core/storageClient.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconExternalLink } from '../components/icons.js';
-import { Alert, Field, Modal, Spinner } from '../components/ui.js';
+import { Alert, CopyField, Field, Modal, Spinner } from '../components/ui.js';
 import { useTour } from '../tour/TourProvider.js';
 import { useBoard, useBoardState, useDispatch, useNow } from '../hooks.js';
 
@@ -323,6 +331,9 @@ export function ControlPanelPage() {
                 state={state}
                 onAction={dispatch}
               />
+            ) : null}
+            {canManageBoards(session.role) ? (
+              <ClockScreensCard tenantId={session.tenantId} boardId={boardId} />
             ) : null}
             <ShortcutCard />
           </aside>
@@ -774,6 +785,71 @@ function LogoCard({
             Remove
           </button>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Share links for the two single-clock displays: `/gameclock/:id` and
+ * `/shotclock/:id`, the game time or the shot clock alone, full screen.
+ *
+ * They live here rather than only in board settings because that is where they
+ * get used — an operator setting up a venue's second monitor or shot-clock
+ * panel is already on this page, mid-setup, and the alternative is a detour
+ * through Settings for a URL they need on another device right now.
+ *
+ * Admins and owners only: both links carry the board's mirror key, and
+ * `firestore.rules` restricts the viewer-key document to those two roles, so an
+ * operator would sit on a permanent "Loading…" instead of a link.
+ */
+function ClockScreensCard({ tenantId, boardId }: { tenantId: string; boardId: string }) {
+  const firestore = getFirestoreClient();
+  const [keys, setKeys] = useState<ViewerKeys>({ overlayKey: null, mirrorKey: null });
+  const origin = window.location.origin;
+
+  useEffect(
+    () => subscribeViewerKeys(firestore, tenantId, boardId, setKeys),
+    [firestore, tenantId, boardId],
+  );
+
+  const screens = keys.mirrorKey
+    ? [
+        {
+          slug: 'gameclock',
+          name: 'game clock',
+          hint: 'Game clock — the game time alone, for a second monitor.',
+          url: buildGameClockUrl(origin, boardId, keys.mirrorKey),
+        },
+        {
+          slug: 'shotclock',
+          name: 'shot clock',
+          hint: 'Shot clock — the shot clock alone, for a pole or wall panel.',
+          url: buildShotClockUrl(origin, boardId, keys.mirrorKey),
+        },
+      ]
+    : [];
+
+  return (
+    <div className="card stack">
+      <h3 className="shortcut-card__title">Clock screens</h3>
+      {screens.length === 0 ? (
+        <span className="muted">Loading…</span>
+      ) : (
+        screens.map(({ slug, name, hint, url }) => (
+          <div key={slug}>
+            <div className="field__hint board-card__hint">{hint}</div>
+            <CopyField label={`${slug}-${boardId}`} value={url} />
+            <a className="btn btn--ghost btn--sm" href={url} target="_blank" rel="noopener">
+              Open {name}
+              <IconExternalLink size={13} />
+            </a>
+          </div>
+        ))
+      )}
+      <div className="field__hint">
+        Read-only, and no sign-in needed. Both use this board&rsquo;s mirror key — rotating the
+        mirror link in Settings revokes these too.
       </div>
     </div>
   );

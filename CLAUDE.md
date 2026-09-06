@@ -82,9 +82,15 @@ plain HTTP functions get no equivalent of the callable-functions handshake.
 TypeScript — no React, no Firestore — because a gym-wall screen and an OBS
 Browser Source should load only what they need. `src/core/firebase.ts` keeps
 Firestore and Storage out of the shared client for the same reason; both have
-their own lazy `*Client.ts` modules. The mirror and overlay authenticate with a
+their own lazy `*Client.ts` modules. The mirror, the overlay and the two
+single-clock screens (`/gameclock/:id`, `/shotclock/:id`) authenticate with a
 viewer key (`?k=…`) exchanged for a board-scoped read-only token; that role
-matches no write rule anywhere.
+matches no write rule anywhere. The clock screens present the board's _mirror_
+key rather than one of their own — same trust class, so a separate kind would
+mean new roles in `database.rules.json` granting exactly what `mirror` already
+grants. Adding a display surface means four edits in step: the entry pair under
+`src/display/`, a `rollupOptions.input` entry and a `displayRoutes()` pattern in
+`vite.config.ts`, and a rewrite in `vercel.json`.
 
 Their asset paths must stay **absolute** (`/display/scoreboard/main.ts`). These
 pages are served under rewritten URLs (`/board/:id`), so a relative path resolves

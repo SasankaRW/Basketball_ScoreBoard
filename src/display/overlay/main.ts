@@ -22,7 +22,7 @@ import {
   renderFatalError,
   type DisplayContext,
 } from '../shared/displayBoot.js';
-import { startDisplayLoop } from '../shared/scoreboardView.js';
+import { startDisplayLoop } from '../shared/displayLoop.js';
 
 function setText(element: HTMLElement | null, value: string): void {
   if (element && element.textContent !== value) element.textContent = value;

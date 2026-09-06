@@ -10,6 +10,8 @@
     { "source": "/board/:id*", "destination": "/display/scoreboard/index.html" },
     { "source": "/mirror/:id*", "destination": "/display/mirror/index.html" },
     { "source": "/overlay/:id*", "destination": "/display/overlay/index.html" },
+    { "source": "/gameclock/:id*", "destination": "/display/gameclock/index.html" },
+    { "source": "/shotclock/:id*", "destination": "/display/shotclock/index.html" },
     { "source": "/(.*)", "destination": "/" }
   ],
   "headers": [

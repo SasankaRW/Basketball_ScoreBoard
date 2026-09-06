@@ -181,6 +181,26 @@ export function buildOverlayUrl(origin: string, boardId: string, key: string): s
   return `${origin}/overlay/${boardId}?k=${key}`;
 }
 
+/**
+ * Single-clock displays — a shot-clock pole, a courtside tablet, a second
+ * screen showing nothing but the game time. No login required.
+ *
+ * Both take the *mirror* key rather than one of their own. They are the same
+ * trust class as the mirror — read-only, board-scoped, handed to whoever is
+ * running the venue's screens — and `exchangeViewerKey` derives the role from
+ * whichever key was presented, so a separate kind would mean new roles in
+ * `database.rules.json` granting exactly what `mirror` already grants. The
+ * practical consequence is the useful one: `Rotate mirror link` revokes every
+ * venue-screen URL for a board at once.
+ */
+export function buildGameClockUrl(origin: string, boardId: string, key: string): string {
+  return `${origin}/gameclock/${boardId}?k=${key}`;
+}
+
+export function buildShotClockUrl(origin: string, boardId: string, key: string): string {
+  return `${origin}/shotclock/${boardId}?k=${key}`;
+}
+
 /** Keyboard-driven scoreboard. Requires an operator sign-in. */
 export function buildScoreboardUrl(origin: string, boardId: string): string {
   return `${origin}/board/${boardId}`;

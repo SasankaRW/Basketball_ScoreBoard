@@ -178,31 +178,3 @@ export function renderScoreboard(
 export function renderPlaceholder(elements: ScoreboardElements, message: string): void {
   setText(elements.controlsInfo, message);
 }
-
-/**
- * Drives `render` on a self-scheduling timer.
- *
- * `setTimeout` rather than `requestAnimationFrame`: rAF is paused entirely in a
- * background tab, which would freeze the clock and — more importantly — swallow
- * the end-of-period buzzer whenever the operator tabbed away. Timers keep
- * running, throttled to about once a second, which is exactly the resolution a
- * clock display needs.
- */
-export function startDisplayLoop(render: () => number): () => void {
-  let handle: ReturnType<typeof setTimeout> | null = null;
-  let stopped = false;
-
-  const step = () => {
-    if (stopped) return;
-    const nextDelay = render();
-    const delay = Math.max(16, Math.min(1_000, Number.isFinite(nextDelay) ? nextDelay : 1_000));
-    handle = setTimeout(step, delay);
-  };
-
-  step();
-
-  return () => {
-    stopped = true;
-    if (handle !== null) clearTimeout(handle);
-  };
-}

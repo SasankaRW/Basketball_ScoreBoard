@@ -342,7 +342,9 @@ export function BoardSettingsPage() {
 
           <p className="field__hint">
             Anyone holding a link can watch this board — they cannot change it. Rotating a link
-            revokes the old URL immediately.
+            revokes the old URL immediately. The mirror key also opens this board&rsquo;s game-clock
+            and shot-clock screens, which the control panel lists — rotating the mirror link revokes
+            those as well.
           </p>
         </div>
       </section>

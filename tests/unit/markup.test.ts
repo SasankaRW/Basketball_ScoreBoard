@@ -30,6 +30,8 @@ function extractScoreboardBlock(html: string): string {
 const SCOREBOARD_HTML = read('src/display/scoreboard/index.html');
 const MIRROR_HTML = read('src/display/mirror/index.html');
 const OVERLAY_HTML = read('src/display/overlay/index.html');
+const GAMECLOCK_HTML = read('src/display/gameclock/index.html');
+const SHOTCLOCK_HTML = read('src/display/shotclock/index.html');
 
 /** Every ID `queryScoreboardElements` resolves. */
 const REQUIRED_IDS = [
@@ -88,6 +90,8 @@ describe('scoreboard and mirror markup', () => {
     ['scoreboard', 'src/display/scoreboard/index.html'],
     ['mirror', 'src/display/mirror/index.html'],
     ['overlay', 'src/display/overlay/index.html'],
+    ['gameclock', 'src/display/gameclock/index.html'],
+    ['shotclock', 'src/display/shotclock/index.html'],
   ])('%s references its entry script absolutely', (_name, path) => {
     expect(read(path)).toMatch(/<script type="module" src="\/display\//);
   });
@@ -131,6 +135,50 @@ describe('overlay page', () => {
 
   it('keeps its own stylesheet rather than the scoreboard one', () => {
     expect(OVERLAY_HTML).toContain('stream-overlay.css');
+  });
+});
+
+describe('clock screens', () => {
+  it.each([
+    ['gameclock', GAMECLOCK_HTML],
+    ['shotclock', SHOTCLOCK_HTML],
+  ])('%s defines the #clock-value node shared/clockScreen.ts writes into', (_name, html) => {
+    expect(html).toContain('id="clock-value"');
+  });
+
+  /**
+   * The body class is what picks the colour and the size of the digits — white
+   * on dark for the game clock, red for the shot clock. Both pages load the
+   * same stylesheet, so a missing modifier renders a correct clock in the
+   * wrong skin rather than failing outright.
+   */
+  it('game-clock page carries its own body modifier', () => {
+    expect(GAMECLOCK_HTML).toContain('class="clock-screen clock-screen--game"');
+  });
+
+  it('shot-clock page carries its own body modifier', () => {
+    expect(SHOTCLOCK_HTML).toContain('class="clock-screen clock-screen--shot"');
+  });
+
+  /** Absolute, for the same reason the other display pages are — see above. */
+  it.each([
+    ['gameclock', GAMECLOCK_HTML],
+    ['shotclock', SHOTCLOCK_HTML],
+  ])('%s links the shared clock stylesheet absolutely', (_name, html) => {
+    expect(html).toContain('href="/display/shared/clock-screen.css"');
+  });
+
+  /**
+   * These are wall displays with no keyboard and no speakers, like the mirror.
+   * Pulling in the scoreboard's stylesheet would also drag its layout onto a
+   * page that has none of the elements it styles.
+   */
+  it.each([
+    ['gameclock', GAMECLOCK_HTML],
+    ['shotclock', SHOTCLOCK_HTML],
+  ])('%s ships no audio and no scoreboard stylesheet', (_name, html) => {
+    expect(html).not.toContain('<audio');
+    expect(html).not.toContain('/display/scoreboard/style.css');
   });
 });
 

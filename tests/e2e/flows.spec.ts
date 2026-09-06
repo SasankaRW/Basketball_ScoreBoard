@@ -97,6 +97,59 @@ test('a control-panel score change is reflected on the scoreboard, mirror, and o
   }
 });
 
+test('the control panel hands out single-clock screens that run off the live board', async ({
+  page,
+  context,
+}) => {
+  await signUp(page, freshAccount('clock-screens'));
+  await createBoard(page, 'Clock Court');
+
+  await page.getByRole('link', { name: 'Control panel' }).click();
+  await expect(page.getByRole('heading', { name: 'Clock Court' })).toBeVisible();
+
+  // Move both clocks off the values the two pages ship as static markup (12:00
+  // and 24). A fresh board sits on exactly those, so asserting against a
+  // default would pass on a page that never reached the database at all.
+  await page.getByRole('button', { name: /^Reset to 14s/ }).click();
+  await page.getByRole('button', { name: 'Set time' }).click();
+  const setTimeDialog = page.getByRole('dialog', { name: 'Set game time' });
+  await setTimeDialog.getByLabel('Minutes').fill('7');
+  await setTimeDialog.getByLabel('Seconds').fill('30');
+  await setTimeDialog.getByRole('button', { name: 'Set time' }).click();
+  await expect(page.locator('.clock-console__game')).toHaveText('07:30');
+
+  const gameClockUrl = await copyFieldValue(page, `gameclock-${page.url().split('/').pop()}`);
+  const shotClockUrl = await copyFieldValue(page, `shotclock-${page.url().split('/').pop()}`);
+
+  // These carry the board's mirror key, so — like the mirror — they must open
+  // with no session whatsoever. A brand-new context proves that rather than
+  // merely asserting the control panel printed a URL.
+  const anonBrowser = await context.browser()!.newContext();
+  try {
+    const gameClockPage = await anonBrowser.newPage();
+    await gameClockPage.goto(gameClockUrl);
+    await expect(gameClockPage.locator('#clock-value')).toHaveText('07:30', { timeout: 10_000 });
+
+    const shotClockPage = await anonBrowser.newPage();
+    await shotClockPage.goto(shotClockUrl);
+    await expect(shotClockPage.locator('#clock-value')).toHaveText('14', { timeout: 10_000 });
+
+    // Each screen shows its own clock and nothing else — a shot-clock panel
+    // that also rendered the game time would be the wrong page entirely.
+    await expect(gameClockPage.locator('#clock-value')).toHaveCount(1);
+    await expect(gameClockPage.getByText('SHOT CLOCK')).toHaveCount(0);
+    await expect(shotClockPage.getByText('GAME TIME')).toHaveCount(0);
+
+    // Read-only, like the mirror: a stray keypress on the venue PC must not
+    // reach the game.
+    await shotClockPage.keyboard.press('Space');
+    await shotClockPage.waitForTimeout(300);
+    await expect(shotClockPage.locator('#clock-value')).toHaveText('14');
+  } finally {
+    await anonBrowser.close();
+  }
+});
+
 test('a rotated viewer key immediately invalidates the old mirror link', async ({
   page,
   context,

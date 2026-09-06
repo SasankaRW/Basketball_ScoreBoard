@@ -1,0 +1,93 @@
+/*
+ * The two single-clock display surfaces: /gameclock/:id and /shotclock/:id.
+ *
+ * Deliberately not the scoreboard's stylesheet. These pages exist to be read
+ * from the far end of a gym — one number, as large as the panel will carry —
+ * so they share the scoreboard's palette and typeface but none of its layout,
+ * and none of its pixel-locked rules (tests/e2e/visual.spec.ts covers the
+ * scoreboard, mirror and overlay; these are free to change).
+ */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+
+:root {
+  --bg-color: #050505;
+  --text-medium: #aaa;
+  --clock-red: #e74c3c;
+  --clock-red-bg: #2a0e0a;
+  --clock-white: #ffffff;
+  --clock-white-bg: #222;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body.clock-screen {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-color);
+  color: var(--clock-white);
+  font-family: 'Orbitron', monospace;
+  overflow: hidden;
+  /* Nothing on this page responds to a pointer, and it is left running
+     untouched for a whole game — a cursor parked over the digits is only
+     something to notice. */
+  cursor: none;
+}
+
+.clock-screen__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.4rem, 2vh, 2rem);
+  width: 96vw;
+}
+
+.clock-screen__label {
+  font-size: clamp(0.9rem, 3vw, 2.5rem);
+  color: var(--text-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  /* letter-spacing trails the last glyph, which would push centred text
+     visibly left of the digits below it. */
+  text-indent: 0.3em;
+}
+
+/*
+ * Full-width, so the panel keeps its shape when the text does not: the game
+ * clock switches between `12:00` and `9.4` under a minute with tenths on, and
+ * a content-sized box would jump a hundred pixels wide at that transition.
+ */
+.clock-screen__value {
+  width: 100%;
+  padding: 0.12em 0.16em;
+  border-radius: clamp(8px, 2vw, 24px);
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Five glyphs at `MM:SS`, so viewport width binds before height does. */
+.clock-screen--game .clock-screen__value {
+  font-size: min(46vh, 17vw);
+  color: var(--clock-white);
+  background-color: var(--clock-white-bg);
+  box-shadow: 0 0 3vh rgba(255, 255, 255, 0.1);
+}
+
+/* Two, so it can run far larger before it runs out of width. */
+.clock-screen--shot .clock-screen__value {
+  font-size: min(62vh, 38vw);
+  color: var(--clock-red);
+  background-color: var(--clock-red-bg);
+  box-shadow: inset 0 0 4vh rgba(0, 0, 0, 0.7);
+}

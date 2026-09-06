@@ -19,11 +19,8 @@ import {
   watchConnection,
   type DisplayContext,
 } from '../shared/displayBoot.js';
-import {
-  queryScoreboardElements,
-  renderScoreboard,
-  startDisplayLoop,
-} from '../shared/scoreboardView.js';
+import { startDisplayLoop } from '../shared/displayLoop.js';
+import { queryScoreboardElements, renderScoreboard } from '../shared/scoreboardView.js';
 
 async function main(): Promise<void> {
   const banner = mountStatusBanner();
