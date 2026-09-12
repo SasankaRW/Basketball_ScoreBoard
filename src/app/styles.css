@@ -1996,14 +1996,28 @@ textarea:focus {
 
 /* ------------------------------------------------------ scoreboard layout */
 /*
-   The layout editor: a scaled preview of the real display on the left, a
-   property panel on the right. The preview is an iframe of this board's mirror,
-   so everything drawn over it has to line up with a document this stylesheet
-   cannot reach — which is why the overlay is positioned in JavaScript from the
-   board rect the frame reports, and why nothing here sets a position itself.
+   The layout editor: a scaled preview of the real display, a short inspector
+   beside it, and — below both — the wider blocks (the section list, the
+   removed tray, publish/reset). Two rows, not one column plus a sidebar: the
+   inspector is only ever as tall as the canvas next to it (screen shape, snap
+   settings, whichever section is selected), so putting the long-growing
+   blocks in that same narrow column left the width under the canvas empty
+   for no reason. Below the canvas, the whole page width is free, so that is
+   where they go.
+
+   The preview is an iframe of this board's mirror, so everything drawn over
+   it has to line up with a document this stylesheet cannot reach — which is
+   why the overlay is positioned in JavaScript from the board rect the frame
+   reports, and why nothing here sets a position itself.
 */
 
 .layout-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.layout-editor__top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: var(--space-5);
@@ -2011,9 +2025,16 @@ textarea:focus {
 }
 
 @media (max-width: 1100px) {
-  .layout-editor {
+  .layout-editor__top {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.layout-editor__bottom {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
 }
 
 .layout-editor__stage {
@@ -2272,8 +2293,22 @@ textarea:focus {
   color: var(--text-muted);
 }
 
+/* Home / Centre / Away side by side rather than stacked — the Sections block
+   now lives in the wide row below the canvas, so there is width to spare for
+   three short columns instead of one long list running underneath it. */
+.layout-panel__columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
+.layout-panel__group {
+  flex: 1 1 160px;
+  min-width: 160px;
+}
+
 .layout-panel__group h3 {
-  margin: var(--space-3) 0 var(--space-2);
+  margin: 0 0 var(--space-2);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2285,6 +2320,16 @@ textarea:focus {
   margin-bottom: var(--space-2);
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.layout-panel__linked-note {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }
 
 .layout-panel__segmented {

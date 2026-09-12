@@ -28,6 +28,8 @@ import {
   MOVE_ANCHORS,
   SECTIONS,
   clampBox,
+  mirrorBox,
+  mirrorPartner,
   resizeBox,
   sectionDefinition,
   snapBox,
@@ -73,6 +75,14 @@ export interface LayoutCanvasProps {
   selected: SectionId | null;
   aspect: CanvasAspect;
   snap: SnapSettings;
+  /**
+   * While on, dragging or resizing a home/away section previews its mirrored
+   * counterpart moving the same way, live, in this same gesture — not only
+   * once the caller applies the committed change. The commit itself (and the
+   * actual mirroring of the *data*) is `onChange`'s caller's job; this prop
+   * only tells the canvas which section to also paint every frame.
+   */
+  linked: boolean;
   onSelect: (id: SectionId | null) => void;
   /** Fired once per gesture, on release — not per frame. */
   onChange: (id: SectionId, box: SectionBox) => void;
@@ -114,6 +124,7 @@ export function LayoutCanvas({
   selected,
   aspect,
   snap,
+  linked,
   onSelect,
   onChange,
   onMeasured,
@@ -139,8 +150,10 @@ export function LayoutCanvas({
   // a stale layout the moment anything else on the page changed.
   const layoutRef = useRef<BoardLayout | null>(layout);
   const snapRef = useRef(snap);
+  const linkedRef = useRef(linked);
   layoutRef.current = layout;
   snapRef.current = snap;
+  linkedRef.current = linked;
 
   // -- Talking to the frame -----------------------------------------------
 
@@ -281,12 +294,25 @@ export function LayoutCanvas({
     placeBox(active.id, active.current);
     showReadout(active.current);
 
+    // Live-preview the mirrored partner moving too — purely cosmetic during
+    // the gesture itself. The actual data-side mirroring happens once, on
+    // commit, in whatever `onChange`'s caller does with it; this only keeps
+    // what the operator sees under the pointer honest with what release will
+    // produce, rather than a box that visibly "catches up" afterward.
+    const partnerId = linkedRef.current ? mirrorPartner(active.id) : null;
+    const partnerBox = partnerId ? mirrorBox(active.current) : null;
+    if (partnerId && partnerBox) placeBox(partnerId, partnerBox);
+
     // The preview is driven with the draft layout rather than the saved one, so
     // the board underneath moves with the handle instead of trailing it.
     post(
       applyMessage({
         ...current,
-        sections: { ...current.sections, [active.id]: active.current },
+        sections: {
+          ...current.sections,
+          [active.id]: active.current,
+          ...(partnerId && partnerBox ? { [partnerId]: partnerBox } : {}),
+        },
       }),
     );
   }, [placeBox, post, showReadout]);

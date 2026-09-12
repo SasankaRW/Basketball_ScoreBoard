@@ -864,18 +864,31 @@ body {
 /* --- Scores --- */
 
 .sb-custom .score {
-  font-size: calc(min(var(--sb-unit) * 0.88, var(--sb-w, 10) * 0.62cqw) * var(--sb-s, 1));
+  /* 0.5, not the 0.62 the height alone would allow: two digits at that font
+     size render wider than the box that produced it, so the width term is
+     deliberately conservative rather than a tight fit. */
+  font-size: calc(min(var(--sb-unit) * 0.88, var(--sb-w, 10) * 0.5cqw) * var(--sb-s, 1));
   line-height: 1;
   border-radius: calc(var(--sb-unit) * 0.05);
 }
 
 /* --- Fouls and timeouts --- */
 
+/*
+   No `width`/`height` here, on purpose — and this is not a stylistic choice,
+   it's load-bearing. `.stat-line` *is* the `.sb-item` (`layoutApply.ts` puts
+   the class on this exact element), so a `width: 100%` / `height: 100%` here
+   would tie for specificity with `.sb-item`'s own `width: calc(var(--sb-w) *
+   1cqw)` / `height: calc(...)` and — being later in the cascade — win the
+   tie, replacing "this section's box" with "100% of the nearest positioned
+   ancestor", which is `.scoreboard` itself. Every section sized this way
+   inflated to the full board and piled up in its centre; that bug shipped
+   once already. `flex-direction`/`gap` arrange the label and value *within*
+   the box `.sb-item` already established; they never need to re-state its size.
+*/
 .sb-custom .stat-line {
   flex-direction: column;
   gap: calc(var(--sb-unit) * 0.04);
-  width: 100%;
-  height: 100%;
 }
 
 .sb-custom .stat-line .label {
@@ -896,12 +909,14 @@ body {
 
 /* --- Clocks --- */
 
+/* Same reason `.stat-line` above carries no `width`/`height`: `.clock-container`
+   is the `.sb-item` for the game clock and the shot clock, and re-stating its
+   size here would win the cascade tie against `.sb-item`'s own `calc()` size
+   and expand it to the whole board. */
 .sb-custom .clock-container {
   flex-direction: column;
   justify-content: center;
   gap: calc(var(--sb-unit) * 0.03);
-  width: 100%;
-  height: 100%;
 }
 
 .sb-custom .clock-label {
@@ -933,20 +948,22 @@ body {
   min-width: 0;
 }
 
+/* No `width`/`height` here either — `.logo` is the `.sb-item` itself, and the
+   same cascade tie described above would replace its box with the whole
+   board. `object-fit: contain` fits the image *inside* the box `.sb-item`
+   already sized; it needs no size of its own to do that. */
 .sb-custom .logo {
   display: block;
-  width: 100%;
-  height: 100%;
   max-height: none;
   object-fit: contain;
   margin: 0;
 }
 
+/* And again: `.controls-info` is the `.sb-item` for the hint line. */
 .sb-custom .controls-info {
   font-size: calc(min(var(--sb-unit) * 0.5, var(--sb-w, 10) * 0.06cqw) * var(--sb-s, 1));
   margin: 0;
   padding: 0;
-  width: 100%;
 }
 
 /* Last, so it outranks every `display` above — including `.sb-custom .logo`,

@@ -21,7 +21,10 @@ import {
   clampBox,
   defaultLayout,
   isDefaultLayout,
+  isGeometryPatch,
   layoutsEqual,
+  mirrorBox,
+  mirrorPartner,
   parseBoardLayout,
   resizeBox,
   sectionDefinition,
@@ -345,5 +348,79 @@ describe('comparing layouts', () => {
   it('notices a single moved section', () => {
     const layout = defaultLayout();
     expect(layoutsEqual(layout, withSection(layout, 'hint', { y: 90 }))).toBe(false);
+  });
+});
+
+describe('home/away linking', () => {
+  it.each([
+    ['home-name', 'away-name'],
+    ['home-score', 'away-score'],
+    ['home-fouls', 'away-fouls'],
+    ['home-timeouts', 'away-timeouts'],
+  ] as const)('pairs %s with %s in both directions', (home, away) => {
+    expect(mirrorPartner(home)).toBe(away);
+    expect(mirrorPartner(away)).toBe(home);
+  });
+
+  it.each(['game-clock', 'shot-clock', 'period', 'logo', 'hint'] as const)(
+    'has no partner for the centre section %s',
+    (id) => {
+      expect(mirrorPartner(id)).toBeNull();
+    },
+  );
+
+  it('reflects a box across the board centre, keeping everything but x', () => {
+    const reflected = mirrorBox(box({ x: 2, y: 15, w: 24, h: 30, scale: 1.2, showLabel: false }));
+
+    // x' = 100 - x - w: the *far* edge from this box's own edge lands the
+    // same distance from the board's far side.
+    expect(reflected.x).toBe(74);
+    expect(reflected.y).toBe(15);
+    expect(reflected.w).toBe(24);
+    expect(reflected.h).toBe(30);
+    expect(reflected.scale).toBe(1.2);
+    expect(reflected.showLabel).toBe(false);
+  });
+
+  it('is its own inverse, so either side can drive the other', () => {
+    const original = box({ x: 12.5, y: 40, w: 18, h: 22 });
+    expect(mirrorBox(mirrorBox(original))).toEqual(original);
+  });
+
+  it('matches the catalog: mirroring one default box gives the other', () => {
+    for (const [home, away] of [
+      ['home-name', 'away-name'],
+      ['home-score', 'away-score'],
+      ['home-fouls', 'away-fouls'],
+      ['home-timeouts', 'away-timeouts'],
+    ] as const) {
+      expect(mirrorBox(sectionDefinition(home).defaultBox)).toEqual(
+        sectionDefinition(away).defaultBox,
+      );
+    }
+  });
+
+  it('clamps the reflected box, so a section run off the left edge does not report a negative width on the right', () => {
+    const reflected = mirrorBox(box({ x: -20, y: 10, w: 10 }));
+    expect(reflected.x).toBeLessThanOrEqual(LAYOUT_LIMITS.position.max);
+    expect(reflected.x).toBeGreaterThanOrEqual(LAYOUT_LIMITS.position.min);
+  });
+
+  it.each([
+    ['a move', { x: 5 }],
+    ['a vertical move', { y: 5 }],
+    ['a resize', { w: 30 }],
+    ['a height change', { h: 30 }],
+    ['a text-size change', { scale: 1.5 }],
+  ])('treats %s as geometry linking should propagate', (_name, patch) => {
+    expect(isGeometryPatch(patch)).toBe(true);
+  });
+
+  it.each([
+    ['removing a section', { visible: false }],
+    ['toggling its caption', { showLabel: false }],
+    ['an empty patch', {}],
+  ])('does not treat %s as geometry', (_name, patch) => {
+    expect(isGeometryPatch(patch)).toBe(false);
   });
 });

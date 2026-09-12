@@ -23,8 +23,12 @@ import {
   LAYOUT_LIMITS,
   SECTIONS,
   SECTION_GROUPS,
+  clampBox,
   defaultLayout,
+  isGeometryPatch,
   layoutsEqual,
+  mirrorBox,
+  mirrorPartner,
   sectionDefinition,
   withSection,
   type BoardLayout,
@@ -64,6 +68,10 @@ export function BoardLayoutPage() {
   const [selected, setSelected] = useState<SectionId | null>(null);
   const [aspect, setAspect] = useState<CanvasAspect>('16 / 9');
   const [snap, setSnap] = useState<SnapSettings>({ enabled: true, grid: 0.5 });
+  // On by default: a scoreboard that drifts out of symmetry mid-edit — home's
+  // score box a size the away one isn't — reads as a mistake rather than a
+  // choice, so keeping the two sides in step is the behaviour most edits want.
+  const [linked, setLinked] = useState(true);
   const [history, setHistory] = useState<(BoardLayout | null)[]>([]);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -91,8 +99,20 @@ export function BoardLayoutPage() {
       db,
       session.tenantId,
       boardId,
-      (snapshot) => setStored(snapshot.layout),
-      () => setError('Could not read this board’s layout.'),
+      (snapshot) => {
+        setStored(snapshot.layout);
+        setError(null);
+      },
+      // An unreadable layout must still let the page leave "loading" — treating
+      // it as "no custom layout" is what a fresh deploy needs, since the most
+      // common cause is `database.rules.json`'s new `layout` node not having
+      // reached the actual Firebase project yet (`npx firebase deploy --only
+      // database`). Leaving `stored` at `undefined` here is what a spinner that
+      // never resolves looks like.
+      () => {
+        setStored(null);
+        setError('Could not read this board’s layout — showing the default instead.');
+      },
     );
   }, [db, session.tenantId, boardId]);
 
@@ -124,11 +144,25 @@ export function BoardLayoutPage() {
       setDraft((current) => {
         if (!current) return current;
         pushHistory(current);
-        return withSection(current, id, patch);
+        let next = withSection(current, id, patch);
+
+        // Propagate to the paired section only when linking is on and the
+        // patch actually moved or resized something — a caption toggle or a
+        // remove is a one-sided content choice, never a placement one, and
+        // stays put regardless of linking. Reflecting the *edited* section's
+        // own post-clamp box (rather than re-deriving from `patch`) is what
+        // keeps a partial patch — a single dragged edge, one changed field —
+        // correct: the partner always mirrors the whole resulting box.
+        const partner = linked ? mirrorPartner(id) : null;
+        if (partner && isGeometryPatch(patch)) {
+          next = withSection(next, partner, mirrorBox(next.sections[id]));
+        }
+
+        return next;
       });
       setNotice(null);
     },
-    [pushHistory],
+    [pushHistory, linked],
   );
 
   const onCanvasChange = useCallback((id: SectionId, box: SectionBox) => edit(id, box), [edit]);
@@ -153,14 +187,19 @@ export function BoardLayoutPage() {
       for (const section of SECTIONS) {
         const rect = metrics.sections[section.id];
         if (!rect) continue;
-        base.sections[section.id] = {
+        // `clampBox` — a measured rect is a real DOM rectangle, not a value
+        // this module chose, and the security rules enforce the same bounds
+        // server-side. Publishing an unclamped float here would either be
+        // rejected on save or, worse, saved and then silently reinterpreted
+        // differently by `clampBox` the next time this exact layout round-trips.
+        base.sections[section.id] = clampBox({
           ...base.sections[section.id],
           x: rect.x,
           y: rect.y,
           w: rect.w,
           h: rect.h,
           visible: rect.visible,
-        };
+        });
       }
     }
 
@@ -294,152 +333,124 @@ export function BoardLayoutPage() {
       {notice ? <Alert kind="success">{notice}</Alert> : null}
 
       <div className="layout-editor">
-        <div className="layout-editor__stage">
-          <LayoutCanvas
-            previewUrl={previewUrl}
-            layout={draft}
-            selected={selected}
-            aspect={aspect}
-            snap={snap}
-            onSelect={setSelected}
-            onChange={onCanvasChange}
-            onMeasured={onMeasured}
-          />
+        {/*
+          Only the canvas and its immediate inspector — screen shape, snap
+          settings, and whichever section is selected — share this row. Both
+          are naturally short, so pairing them keeps the row itself only as
+          tall as the canvas. Sections, Removed, and the publish/reset actions
+          used to live in this same column and simply kept growing past the
+          canvas's own height, leaving the whole width below it empty; they
+          move to their own full-width row below instead, where the space
+          that ran under the canvas is actually there to use.
+        */}
+        <div className="layout-editor__top">
+          <div className="layout-editor__stage">
+            <LayoutCanvas
+              previewUrl={previewUrl}
+              layout={draft}
+              selected={selected}
+              aspect={aspect}
+              snap={snap}
+              linked={linked}
+              onSelect={setSelected}
+              onChange={onCanvasChange}
+              onMeasured={onMeasured}
+            />
 
-          {!draft ? (
-            <div className="layout-editor__intro">
-              <p>
-                This board uses the default scoreboard layout. Customising it lets you move, resize,
-                and remove sections — the original is always one reset away.
-              </p>
-              <button type="button" className="btn btn--primary" onClick={startCustomising}>
-                Customise layout
-              </button>
-            </div>
-          ) : null}
-
-          <p className="layout-editor__hint muted">
-            Drag a section to move it. Grab an edge or corner to resize. Hold <kbd>Alt</kbd> to
-            ignore the guides, arrow keys to nudge, <kbd>Shift</kbd> for bigger steps.
-          </p>
-        </div>
-
-        <aside className="layout-panel">
-          <section className="layout-panel__block">
-            <h2>Canvas</h2>
-            {/* A group of buttons, not a form control, so it carries its own
-                grouping label rather than going through `Field` — which wires a
-                `<label for>` at a single input and has nothing to point at here. */}
-            <div className="field" role="group" aria-label="Preview screen shape">
-              <span className="layout-panel__label">Screen shape</span>
-              <div className="layout-panel__segmented">
-                {ASPECTS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={`btn btn--sm${aspect === option.value ? ' btn--active' : ''}`}
-                    aria-pressed={aspect === option.value}
-                    onClick={() => setAspect(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+            {!draft ? (
+              <div className="layout-editor__intro">
+                <p>
+                  This board uses the default scoreboard layout. Customising it lets you move,
+                  resize, and remove sections — the original is always one reset away.
+                </p>
+                <button type="button" className="btn btn--primary" onClick={startCustomising}>
+                  Customise layout
+                </button>
               </div>
+            ) : null}
+
+            <p className="layout-editor__hint muted">
+              Drag a section to move it. Grab an edge or corner to resize. Hold <kbd>Alt</kbd> to
+              ignore the guides, arrow keys to nudge, <kbd>Shift</kbd> for bigger steps.
+            </p>
+          </div>
+
+          <aside className="layout-panel">
+            <section className="layout-panel__block">
+              <h2>Canvas</h2>
+              {/* A group of buttons, not a form control, so it carries its own
+                  grouping label rather than going through `Field` — which wires a
+                  `<label for>` at a single input and has nothing to point at here. */}
+              <div className="field" role="group" aria-label="Preview screen shape">
+                <span className="layout-panel__label">Screen shape</span>
+                <div className="layout-panel__segmented">
+                  {ASPECTS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`btn btn--sm${aspect === option.value ? ' btn--active' : ''}`}
+                      aria-pressed={aspect === option.value}
+                      onClick={() => setAspect(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <span className="field__hint">
+                  Only changes this preview, never the saved layout.
+                </span>
+              </div>
+
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={snap.enabled}
+                  onChange={(event) =>
+                    setSnap((current) => ({ ...current, enabled: event.target.checked }))
+                  }
+                />
+                Snap to guides
+              </label>
+
+              <Field label="Grid (%)" hint="0 turns the grid off and leaves alignment snapping on.">
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={snap.grid}
+                  onChange={(event) =>
+                    setSnap((current) => ({ ...current, grid: Number(event.target.value) }))
+                  }
+                />
+              </Field>
+
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={linked}
+                  onChange={(event) => setLinked(event.target.checked)}
+                />
+                Link home ↔ away
+              </label>
               <span className="field__hint">
-                Only changes this preview, never the saved layout.
+                Moving or resizing a team name, score, fouls, or timeouts box applies the same
+                change to its mirror on the other side.
               </span>
-            </div>
+            </section>
 
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={snap.enabled}
-                onChange={(event) =>
-                  setSnap((current) => ({ ...current, enabled: event.target.checked }))
-                }
-              />
-              Snap to guides
-            </label>
-
-            <Field label="Grid (%)" hint="0 turns the grid off and leaves alignment snapping on.">
-              <input
-                type="number"
-                min={0}
-                max={10}
-                step={0.5}
-                value={snap.grid}
-                onChange={(event) =>
-                  setSnap((current) => ({ ...current, grid: Number(event.target.value) }))
-                }
-              />
-            </Field>
-          </section>
-
-          {draft ? (
-            <>
-              <section className="layout-panel__block">
-                <h2>Sections</h2>
-                {SECTION_GROUPS.map((group) => (
-                  <div key={group} className="layout-panel__group">
-                    <h3>{group}</h3>
-                    <ul className="layout-list">
-                      {SECTIONS.filter(
-                        (section) => section.group === group && draft.sections[section.id].visible,
-                      ).map((section) => (
-                        <li key={section.id}>
-                          <button
-                            type="button"
-                            className={`layout-list__name${
-                              selected === section.id ? ' is-selected' : ''
-                            }`}
-                            onClick={() => setSelected(section.id)}
-                          >
-                            {section.label}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--sm"
-                            aria-label={`Remove ${section.label}`}
-                            onClick={() => edit(section.id, { visible: false })}
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </section>
-
-              <section className="layout-panel__block">
-                <h2>Removed</h2>
-                {hidden.length === 0 ? (
-                  <p className="muted">Every section is on the board.</p>
-                ) : (
-                  <ul className="layout-chips">
-                    {hidden.map((section) => (
-                      <li key={section.id}>
-                        <button
-                          type="button"
-                          className="btn btn--sm"
-                          aria-label={`Add ${section.label}`}
-                          onClick={() => {
-                            edit(section.id, { visible: true });
-                            setSelected(section.id);
-                          }}
-                        >
-                          + {section.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
+            {draft ? (
               <section className="layout-panel__block">
                 <h2>{selected ? sectionDefinition(selected).label : 'Position & size'}</h2>
                 {selectedBox && selected ? (
                   <>
+                    {linked && mirrorPartner(selected) ? (
+                      <p className="layout-panel__linked-note">
+                        Linked to {sectionDefinition(mirrorPartner(selected)!).label} — moving or
+                        resizing this also updates it.
+                      </p>
+                    ) : null}
+
                     <div className="field-row">
                       <NumberField
                         label="X (%)"
@@ -514,43 +525,114 @@ export function BoardLayoutPage() {
                     </div>
                   </>
                 ) : (
-                  <p className="muted">Pick a section on the board or in the list above.</p>
+                  <p className="muted">Pick a section on the board or in the list below.</p>
                 )}
               </section>
-            </>
-          ) : null}
+            ) : null}
+          </aside>
+        </div>
 
-          <section className="layout-panel__block">
-            <div className="layout-panel__actions">
+        {draft ? (
+          <div className="layout-editor__bottom">
+            <section className="layout-panel__block">
+              <h2>Sections</h2>
+              <div className="layout-panel__columns">
+                {SECTION_GROUPS.map((group) => (
+                  <div key={group} className="layout-panel__group">
+                    <h3>{group}</h3>
+                    <ul className="layout-list">
+                      {SECTIONS.filter(
+                        (section) => section.group === group && draft.sections[section.id].visible,
+                      ).map((section) => (
+                        <li key={section.id}>
+                          <button
+                            type="button"
+                            className={`layout-list__name${
+                              selected === section.id ? ' is-selected' : ''
+                            }`}
+                            onClick={() => setSelected(section.id)}
+                          >
+                            {section.label}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--sm"
+                            aria-label={`Remove ${section.label}`}
+                            onClick={() => edit(section.id, { visible: false })}
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="layout-panel__block">
+              <h2>Removed</h2>
+              {hidden.length === 0 ? (
+                <p className="muted">Every section is on the board.</p>
+              ) : (
+                <ul className="layout-chips">
+                  {hidden.map((section) => (
+                    <li key={section.id}>
+                      <button
+                        type="button"
+                        className="btn btn--sm"
+                        aria-label={`Add ${section.label}`}
+                        onClick={() => {
+                          edit(section.id, { visible: true });
+                          setSelected(section.id);
+                        }}
+                      >
+                        + {section.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="layout-panel__block">
+              <h2>Publish</h2>
+              <div className="layout-panel__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={!dirty || saving}
+                  onClick={() => void save()}
+                >
+                  {saving ? 'Publishing…' : 'Publish layout'}
+                </button>
+                <button type="button" className="btn" disabled={!dirty || saving} onClick={discard}>
+                  Discard changes
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={history.length === 0}
+                  onClick={undo}
+                >
+                  Undo
+                </button>
+              </div>
               <button
                 type="button"
-                className="btn btn--primary"
-                disabled={!draft || !dirty || saving}
-                onClick={() => void save()}
+                className="btn btn--danger"
+                disabled={saving}
+                onClick={() => void resetToDefault()}
               >
-                {saving ? 'Publishing…' : 'Publish layout'}
+                Reset to default layout
               </button>
-              <button type="button" className="btn" disabled={!dirty || saving} onClick={discard}>
-                Discard changes
-              </button>
-              <button type="button" className="btn" disabled={history.length === 0} onClick={undo}>
-                Undo
-              </button>
-            </div>
-            <button
-              type="button"
-              className="btn btn--danger"
-              disabled={saving || (stored === null && draft === null)}
-              onClick={() => void resetToDefault()}
-            >
-              Reset to default layout
-            </button>
-            <p className="muted">
-              Reset deletes the custom arrangement. Every screen on this board goes back to the
-              scoreboard it shipped with.
-            </p>
-          </section>
-        </aside>
+              <p className="muted">
+                Reset deletes the custom arrangement. Every screen on this board goes back to the
+                scoreboard it shipped with.
+              </p>
+            </section>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );

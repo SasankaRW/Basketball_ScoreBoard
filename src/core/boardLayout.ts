@@ -201,6 +201,59 @@ export function isSectionId(value: unknown): value is SectionId {
 }
 
 // ---------------------------------------------------------------------------
+// Home/away linking
+// ---------------------------------------------------------------------------
+
+/**
+ * Each home section's away counterpart, and back again.
+ *
+ * Only the four sections that actually come in a pair: the centre console has
+ * nothing on "the other side" to stay consistent with. Built from a half-list
+ * so the two directions can never drift apart from each other by a typo.
+ */
+const MIRROR_HALF: readonly [SectionId, SectionId][] = [
+  ['home-name', 'away-name'],
+  ['home-score', 'away-score'],
+  ['home-fouls', 'away-fouls'],
+  ['home-timeouts', 'away-timeouts'],
+];
+
+const MIRROR_PAIRS: ReadonlyMap<SectionId, SectionId> = new Map([
+  ...MIRROR_HALF,
+  ...MIRROR_HALF.map(([home, away]) => [away, home] as [SectionId, SectionId]),
+]);
+
+/** This section's home/away counterpart, or `null` for a centre section. */
+export function mirrorPartner(id: SectionId): SectionId | null {
+  return MIRROR_PAIRS.get(id) ?? null;
+}
+
+/**
+ * Reflects a box across the board's vertical centre line.
+ *
+ * Every field but `x` carries straight across — same row, same size, same
+ * type scale, same caption choice — because "linked" means the two sides stay
+ * *identical apart from which edge they hang from*. Only the horizontal
+ * position is mirrored, and mirrored through the box's own width rather than
+ * its bare `x`, so a box's *right* edge on one side lands at the matching
+ * distance from the *left* edge on the other: `x' = 100 − x − w`. Reflection
+ * is its own inverse, so this needs no notion of which side is "the real one"
+ * — dragging either half updates the other the same way.
+ *
+ * `visible` is deliberately absent: showing one side's fouls but not the
+ * other's is a legitimate, one-sided content choice, not a placement one, and
+ * linking is scoped to movement and resizing — never to what is on the board.
+ */
+export function mirrorBox(box: SectionBox): SectionBox {
+  return clampBox({ ...box, x: 100 - box.x - box.w });
+}
+
+/** Whether a patch touches placement — the properties linking propagates. */
+export function isGeometryPatch(patch: Partial<SectionBox>): boolean {
+  return ['x', 'y', 'w', 'h', 'scale'].some((key) => key in patch);
+}
+
+// ---------------------------------------------------------------------------
 // The layout document
 // ---------------------------------------------------------------------------
 

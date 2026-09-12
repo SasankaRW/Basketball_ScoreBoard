@@ -129,3 +129,37 @@ test('reset returns the board to the scoreboard it shipped with', async ({ page,
   // And the editor is back to offering the opt-in.
   await expect(page.getByRole('button', { name: 'Customise layout' })).toBeVisible();
 });
+
+test('linking mirrors a moved or resized section onto its home/away pair, until turned off', async ({
+  page,
+}) => {
+  await openLayoutEditor(page, 'Linked Court');
+  await page.getByRole('button', { name: 'Customise layout' }).click();
+  await expect(preview(page).locator('.scoreboard')).toHaveClass(/sb-custom/, { timeout: 15_000 });
+
+  // On by default — a scoreboard drifting out of symmetry mid-edit reads as
+  // a mistake, not a choice.
+  await expect(page.getByRole('checkbox', { name: 'Link home ↔ away' })).toBeChecked();
+
+  await page.getByRole('button', { name: 'Home score', exact: true }).click();
+  await page.getByLabel('X (%)').fill('10');
+
+  await page.getByRole('button', { name: 'Away score', exact: true }).click();
+  // x' = 100 - x - w, with the catalog's default width (24) untouched.
+  await expect(page.getByLabel('X (%)')).toHaveValue('66');
+
+  // A resize on a different pair, proving it isn't only positions that mirror.
+  await page.getByRole('button', { name: 'Home fouls', exact: true }).click();
+  await page.getByLabel('Width (%)').fill('30');
+
+  await page.getByRole('button', { name: 'Away fouls', exact: true }).click();
+  await expect(page.getByLabel('Width (%)')).toHaveValue('30');
+
+  // Turned off: a further edit stays one-sided.
+  await page.getByRole('checkbox', { name: 'Link home ↔ away' }).uncheck();
+  await page.getByRole('button', { name: 'Home score', exact: true }).click();
+  await page.getByLabel('X (%)').fill('5');
+
+  await page.getByRole('button', { name: 'Away score', exact: true }).click();
+  await expect(page.getByLabel('X (%)')).toHaveValue('66');
+});
