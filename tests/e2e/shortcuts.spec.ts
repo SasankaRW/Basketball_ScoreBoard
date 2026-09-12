@@ -168,3 +168,55 @@ test('keys pressed while the editor is open do not reach the game', async ({ pag
   await expect(page.locator(homeScore).first()).toHaveText('00');
   await expect(page.locator('.stat-row__value').first()).toHaveText('0');
 });
+
+/**
+ * The left click is the one control that binds only with Shift held, because
+ * the bare click is what presses every button on the page and dispatch listens
+ * on the document. Three things only a browser can show: that the bare click
+ * is refused *and* says why, that Shift + click is accepted, and that firing
+ * the shortcut on top of one of the panel's own buttons runs the shortcut
+ * alone — `preventDefault` on the mousedown does not stop the click that
+ * follows it, so the panel kills that click separately.
+ */
+test('the left click binds with Shift held, and only with Shift held', async ({ page }) => {
+  await signUp(page, freshAccount('keys-leftclick'));
+  await openControlPanel(page, 'Click Court');
+
+  // Dead space inside the editor: a paragraph, so a click on it is a click on
+  // nothing that would clear the notice again.
+  const editorProse = page.locator('.shortcut-editor__intro');
+
+  await openShortcutEditor(page);
+  await page.getByRole('button', { name: 'Change shortcut for Home +1' }).click();
+
+  // A bare click still works the editor — the capture stays armed — but no
+  // longer in silence, which is the whole hint.
+  await editorProse.click();
+  await expect(page.getByText(/hold Shift and click to bind it/)).toBeVisible();
+  await expect(page.getByText('Press a key or click a mouse button for “Home +1”')).toBeVisible();
+
+  // Shift + click on that same dead space is a binding.
+  await editorProse.click({ modifiers: ['Shift'] });
+  await expect(page.getByLabel('Change shortcut for Home +1')).toBeVisible();
+  await expect(page.getByRole('dialog')).toContainText('Shift + Left click');
+  await page.getByRole('button', { name: 'Done' }).click();
+
+  // Shift + click on the panel's own dead space scores…
+  await page.getByRole('heading', { name: 'Click Court' }).click({ modifiers: ['Shift'] });
+  await expect(page.locator(homeScore).first()).toHaveText('01');
+
+  // …and so does one on a panel button, which must not also fire its own
+  // action: the away score stays where it was.
+  const awayPlusOne = page
+    .locator('.team-panel')
+    .last()
+    .getByRole('button', { name: '+1', exact: true });
+  await awayPlusOne.click({ modifiers: ['Shift'] });
+  await expect(page.locator(homeScore).first()).toHaveText('02');
+  await expect(page.locator(homeScore).last()).toHaveText('00');
+
+  // The bare click still just presses buttons.
+  await awayPlusOne.click();
+  await expect(page.locator(homeScore).last()).toHaveText('01');
+  await expect(page.locator(homeScore).first()).toHaveText('02');
+});

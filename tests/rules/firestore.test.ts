@@ -176,6 +176,86 @@ describe('tenant document', () => {
       updateDoc(doc(as(UID_VIEWER_A, TENANT_A, 'viewer'), 'tenants', TENANT_A), { name: 'X' }),
     );
   });
+
+  /**
+   * The shared shortcut layout lives at `settings.keymap` on this document
+   * rather than in a collection of its own, precisely so it inherits these
+   * clauses instead of adding a new surface to prove. These cases pin that
+   * inheritance: every member reads the layout they score with, only
+   * owner/admin change it for the organisation, and it does not cross tenants.
+   *
+   * The write is a *dotted path*, which is what the client sends — a
+   * whole-`settings` write would pass the same rule but drop every other
+   * setting, so testing the merge form is testing what actually ships.
+   */
+  describe('shared shortcut keymap', () => {
+    const KEYMAP = { 'score.home.plus1': { code: 'Mouse0', shift: true } };
+
+    it('is readable by every member role, since everyone scores with it', async () => {
+      for (const [uid, role] of [
+        [UID_OWNER_A, 'owner'],
+        [UID_ADMIN_A, 'admin'],
+        [UID_OPERATOR_A, 'operator'],
+        [UID_VIEWER_A, 'viewer'],
+      ] as const) {
+        await assertSucceeds(getDoc(doc(as(uid, TENANT_A, role), 'tenants', TENANT_A)));
+      }
+    });
+
+    it('lets an owner or admin set it', async () => {
+      for (const [uid, role] of [
+        [UID_OWNER_A, 'owner'],
+        [UID_ADMIN_A, 'admin'],
+      ] as const) {
+        await assertSucceeds(
+          updateDoc(doc(as(uid, TENANT_A, role), 'tenants', TENANT_A), {
+            'settings.keymap': KEYMAP,
+          }),
+        );
+      }
+    });
+
+    it('does not let an operator or viewer set it', async () => {
+      for (const [uid, role] of [
+        [UID_OPERATOR_A, 'operator'],
+        [UID_VIEWER_A, 'viewer'],
+      ] as const) {
+        await assertFails(
+          updateDoc(doc(as(uid, TENANT_A, role), 'tenants', TENANT_A), {
+            'settings.keymap': KEYMAP,
+          }),
+        );
+      }
+    });
+
+    it('cannot be set in another tenant', async () => {
+      await assertFails(
+        updateDoc(doc(as(UID_OWNER_A, TENANT_A, 'owner'), 'tenants', TENANT_B), {
+          'settings.keymap': KEYMAP,
+        }),
+      );
+    });
+
+    /**
+     * Sharing the document with `name` is the cost of not adding a new
+     * surface, so this checks the allowlist still holds: an admin writing the
+     * keymap cannot smuggle a privileged field along beside it.
+     */
+    it('cannot carry a privileged field along with it', async () => {
+      await assertFails(
+        updateDoc(doc(as(UID_ADMIN_A, TENANT_A, 'admin'), 'tenants', TENANT_A), {
+          'settings.keymap': KEYMAP,
+          plan: 'enterprise',
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(as(UID_ADMIN_A, TENANT_A, 'admin'), 'tenants', TENANT_A), {
+          'settings.keymap': KEYMAP,
+          status: 'suspended',
+        }),
+      );
+    });
+  });
 });
 
 describe('members', () => {

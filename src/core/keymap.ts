@@ -23,8 +23,8 @@
  * A mouse button binds the same way: it is encoded as a synthetic `MouseN`
  * code (`N` is `MouseEvent.button`), so it round-trips through this same
  * `code`/`shift` shape without a parallel type. `Mouse0` — the plain left
- * click every button on this page is pressed with — is never bindable; see
- * `isBindableCode`.
+ * click every button on this page is pressed with — is the one control that
+ * binds *only* with Shift held; see `isBindableCode`.
  */
 
 export interface KeyBinding {
@@ -218,18 +218,28 @@ const MODIFIER_CODES = new Set([
   'NumLock',
 ]);
 
-const UNBINDABLE = new Set([
-  ...MODIFIER_CODES,
-  'Escape',
-  'Tab',
-  'ContextMenu',
-  'F5',
-  'F11',
-  'F12',
-  // The plain left click, reserved for pressing the buttons on this page —
-  // every other mouse button is fair game.
-  'Mouse0',
-]);
+const UNBINDABLE = new Set([...MODIFIER_CODES, 'Escape', 'Tab', 'ContextMenu', 'F5', 'F11', 'F12']);
+
+/**
+ * Controls that bind only with Shift held.
+ *
+ * The bare left click presses everything on the page — the panel's own
+ * buttons, this editor's "Change" and "Done", the nav — and both the editor's
+ * capture and the panel's dispatch listen on the *document*, so a command on
+ * bare `Mouse0` would fire on all of them. `Shift` + left click collides with
+ * nothing the console uses, so that combination is offered while the bare
+ * click stays reserved for operating the UI.
+ *
+ * Kept apart from `UNBINDABLE` because the answer depends on the whole
+ * binding rather than the code alone — which is why `isBindableCode` takes
+ * `shift`, and why every caller has to pass it.
+ */
+const SHIFT_ONLY = new Set(['Mouse0']);
+
+/** Whether `code` needs Shift before it can be bound at all. */
+export function isShiftOnlyCode(code: string): boolean {
+  return SHIFT_ONLY.has(code);
+}
 
 /**
  * A modifier pressed on its own.
@@ -244,8 +254,9 @@ export function isModifierCode(code: string): boolean {
   return MODIFIER_CODES.has(code);
 }
 
-export function isBindableCode(code: string): boolean {
-  return code.length > 0 && !UNBINDABLE.has(code);
+export function isBindableCode(code: string, shift = false): boolean {
+  if (code.length === 0 || UNBINDABLE.has(code)) return false;
+  return shift || !SHIFT_ONLY.has(code);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,8 +331,9 @@ export function withoutBinding(keymap: Keymap, id: CommandId): Keymap {
 function parseBinding(raw: unknown): KeyBinding | null {
   if (!raw || typeof raw !== 'object') return null;
   const { code, shift } = raw as { code?: unknown; shift?: unknown };
-  if (typeof code !== 'string' || !isBindableCode(code)) return null;
-  return { code, shift: shift === true };
+  const held = shift === true;
+  if (typeof code !== 'string' || !isBindableCode(code, held)) return null;
+  return { code, shift: held };
 }
 
 /**

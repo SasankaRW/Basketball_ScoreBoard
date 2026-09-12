@@ -12,15 +12,25 @@
  * a normal tenant membership. A plain email check against the verified ID
  * token has no such failure mode, survives every one of those writes
  * untouched, and needs no bootstrap script to grant.
+ *
+ * The running-games read goes straight at the Realtime Database with the
+ * Admin SDK, the same way `startScheduledMatch`/`finishMatch` do — it bypasses
+ * `database.rules.json` entirely, which is what makes a *cross*-tenant read
+ * possible at all: every per-tenant rule on that tree only ever grants a
+ * client its own tenant's `live/{tenantId}` subtree, and this deliberately
+ * never becomes a rule or a claim, so that boundary is not weakened for
+ * anyone but this one server-side query.
  */
 import { z } from 'zod';
-import { ApiError, firestore, type SignedInCaller } from './common.js';
-import type { SiteAdminActivity, SiteAdminOverview, SiteAdminTenant } from '../core/siteAdmin.js';
+import { ApiError, database, firestore, type SignedInCaller } from './common.js';
+import { isBoardIdle, parseLiveBoardState } from '../core/schema.js';
+import type {
+  SiteAdminOverview,
+  SiteAdminRunningGame,
+  SiteAdminTenant,
+} from '../core/siteAdmin.js';
 
 const SITE_ADMIN_EMAILS = new Set(['sasankarw@gmail.com']);
-
-/** How many of the most recent cross-tenant events to bring back at once. */
-const ACTIVITY_LIMIT = 100;
 
 export const SiteAdminOverviewInput = z.object({});
 
@@ -30,49 +40,72 @@ export async function getSiteAdminOverview(caller: SignedInCaller): Promise<Site
   }
 
   const tenantsSnapshot = await firestore.collection('tenants').get();
-  const tenants: SiteAdminTenant[] = await Promise.all(
+
+  const perTenant = await Promise.all(
     tenantsSnapshot.docs.map(async (tenantDoc) => {
       const data = tenantDoc.data();
-      const [members, boards] = await Promise.all([
+      const [membersCount, boardsSnapshot] = await Promise.all([
         tenantDoc.ref.collection('members').count().get(),
-        tenantDoc.ref.collection('boards').count().get(),
+        tenantDoc.ref.collection('boards').get(),
       ]);
-      return {
+
+      const activeBoards = boardsSnapshot.docs
+        .filter((boardDoc) => boardDoc.data()['archived'] !== true)
+        .map((boardDoc) => ({
+          id: boardDoc.id,
+          name:
+            typeof boardDoc.data()['name'] === 'string'
+              ? (boardDoc.data()['name'] as string)
+              : 'Untitled board',
+        }));
+
+      const tenant: SiteAdminTenant = {
         id: tenantDoc.id,
         name: typeof data['name'] === 'string' ? data['name'] : 'Untitled organisation',
         plan: typeof data['plan'] === 'string' ? data['plan'] : 'free',
-        memberCount: members.data().count,
-        boardCount: boards.data().count,
+        memberCount: membersCount.data().count,
+        boardCount: boardsSnapshot.size,
         createdAt: typeof data['createdAt'] === 'number' ? data['createdAt'] : 0,
       };
+
+      return { tenant, boards: activeBoards };
     }),
   );
-  tenants.sort((a, b) => b.createdAt - a.createdAt);
 
-  const tenantNames = new Map(tenants.map((tenant) => [tenant.id, tenant.name]));
+  const tenants = perTenant.map((entry) => entry.tenant).sort((a, b) => b.createdAt - a.createdAt);
 
-  // `tenants/{tenantId}/audit/{auditId}` — the collection group has no
-  // tenantId field of its own, so it comes from the document's grandparent
-  // rather than its data.
-  const activitySnapshot = await firestore
-    .collectionGroup('audit')
-    .orderBy('ts', 'desc')
-    .limit(ACTIVITY_LIMIT)
-    .get();
+  // One read for the whole tree rather than one per board — `live/{tenantId}`
+  // holds every board this tenant has, so this is the same number of round
+  // trips regardless of how many tenants or boards exist.
+  const liveSnapshot = await database.ref('live').get();
+  const liveTree = (liveSnapshot.val() ?? {}) as Record<
+    string,
+    Record<string, { state?: unknown }> | undefined
+  >;
 
-  const activity: SiteAdminActivity[] = activitySnapshot.docs.map((auditDoc) => {
-    const data = auditDoc.data();
-    const tenantId = auditDoc.ref.parent.parent?.id ?? '';
-    return {
-      id: auditDoc.id,
-      tenantId,
-      tenantName: tenantNames.get(tenantId) ?? tenantId,
-      action: typeof data['action'] === 'string' ? data['action'] : '',
-      detail: typeof data['detail'] === 'string' ? data['detail'] : '',
-      actorEmail: typeof data['actorEmail'] === 'string' ? data['actorEmail'] : '',
-      ts: typeof data['ts'] === 'number' ? data['ts'] : 0,
-    };
-  });
+  const runningGames: SiteAdminRunningGame[] = [];
+  for (const { tenant, boards } of perTenant) {
+    const tenantLive = liveTree[tenant.id];
+    if (!tenantLive) continue;
 
-  return { tenants, activity };
+    for (const board of boards) {
+      const state = parseLiveBoardState(tenantLive[board.id]?.state);
+      if (!state || isBoardIdle(state)) continue;
+
+      runningGames.push({
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        boardId: board.id,
+        boardName: board.name,
+        homeName: state.home.name,
+        homeScore: state.home.score,
+        awayName: state.away.name,
+        awayScore: state.away.score,
+        period: state.period,
+        gameClock: state.gameClock,
+      });
+    }
+  }
+
+  return { tenants, runningGames };
 }

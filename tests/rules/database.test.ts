@@ -20,6 +20,7 @@ import {
   claims,
   createTestEnv,
   eventsPath,
+  layoutPath,
   statePath,
   TENANT_A,
   TENANT_B,
@@ -29,6 +30,7 @@ import {
   UID_OWNER_A,
   UID_VIEWER_A,
   validEvent,
+  validLayout,
   validState,
 } from './helpers.js';
 
@@ -501,5 +503,132 @@ describe('paths outside the live tree', () => {
   it('denies writing arbitrary top-level nodes', async () => {
     const db = as(UID_OWNER_A, TENANT_A, 'owner');
     await assertFails(set(ref(db, 'anything'), { a: 1 }));
+  });
+});
+
+describe('board layout', () => {
+  /**
+   * The layout is how a board looks on a gym wall, and it is stored per tenant
+   * alongside the live state. That makes it exactly as much of an isolation
+   * question as the score is: one tenant rearranging another tenant's
+   * scoreboard is a defacement, not a preference.
+   */
+  describe('tenant isolation', () => {
+    it("denies reading another tenant's layout", async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertFails(get(ref(db, layoutPath(TENANT_B, BOARD_B1))));
+    });
+
+    it("denies writing another tenant's layout", async () => {
+      const db = as(UID_OPERATOR_A, TENANT_A, 'operator');
+      await assertFails(set(ref(db, layoutPath(TENANT_B, BOARD_B1)), validLayout()));
+    });
+
+    it('denies an unauthenticated reader and writer', async () => {
+      const db = env.unauthenticatedContext().database();
+      await assertFails(get(ref(db, layoutPath(TENANT_A, BOARD_A1))));
+      await assertFails(set(ref(db, layoutPath(TENANT_A, BOARD_A1)), validLayout()));
+    });
+  });
+
+  describe('roles', () => {
+    it.each(['owner', 'admin', 'operator'] as const)('lets %s publish a layout', async (role) => {
+      const db = as(UID_OWNER_A, TENANT_A, role);
+      await assertSucceeds(set(ref(db, layoutPath(TENANT_A, BOARD_A1)), validLayout()));
+    });
+
+    it('lets a viewer read but never write', async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await set(ref(ctx.database(), layoutPath(TENANT_A, BOARD_A1)), validLayout());
+      });
+
+      const db = as(UID_VIEWER_A, TENANT_A, 'viewer');
+      await assertSucceeds(get(ref(db, layoutPath(TENANT_A, BOARD_A1))));
+      await assertFails(set(ref(db, layoutPath(TENANT_A, BOARD_A1)), validLayout()));
+    });
+
+    /**
+     * The mirror is the surface this feature exists for — a layout nobody can
+     * read from a wall display is a layout that does nothing — and it holds
+     * only a board-scoped token, so its read has to be granted the same narrow
+     * way `state`'s is.
+     */
+    it("lets this board's mirror read the layout and no other board's", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await set(ref(ctx.database(), layoutPath(TENANT_A, BOARD_A1)), validLayout());
+      });
+
+      const db = as('uid_mirror', TENANT_A, 'mirror', BOARD_A1);
+      await assertSucceeds(get(ref(db, layoutPath(TENANT_A, BOARD_A1))));
+      await assertFails(get(ref(db, layoutPath(TENANT_A, BOARD_A2))));
+    });
+
+    it('never lets a mirror write one', async () => {
+      const db = as('uid_mirror', TENANT_A, 'mirror', BOARD_A1);
+      await assertFails(set(ref(db, layoutPath(TENANT_A, BOARD_A1)), validLayout()));
+    });
+  });
+
+  describe('validation', () => {
+    const write = (layout: Record<string, unknown>) =>
+      set(ref(as(UID_ADMIN_A, TENANT_A, 'admin'), layoutPath(TENANT_A, BOARD_A1)), layout);
+
+    it('accepts the document the app actually writes', async () => {
+      await assertSucceeds(write(validLayout()));
+    });
+
+    it('rejects a version this build does not understand', async () => {
+      await assertFails(write(validLayout({ version: 2 })));
+    });
+
+    it('rejects a document with no sections', async () => {
+      await assertFails(write({ version: 1, updatedAt: Date.now(), updatedBy: UID_ADMIN_A }));
+    });
+
+    it('rejects a section missing its geometry', async () => {
+      await assertFails(write({ version: 1, sections: { 'home-score': { x: 1, y: 2, w: 3 } } }));
+    });
+
+    it.each([
+      ['a position far off the board', { x: 5_000 }],
+      ['a negative width', { w: -4 }],
+      ['a width past the ceiling', { w: 5_000 }],
+      ['a scale below the floor', { scale: 0.01 }],
+      ['a scale past the ceiling', { scale: 99 }],
+    ])('rejects %s', async (_name, patch) => {
+      const layout = validLayout();
+      const sections = layout['sections'] as Record<string, Record<string, unknown>>;
+      await assertFails(
+        write({
+          ...layout,
+          sections: { ...sections, 'home-score': { ...sections['home-score'], ...patch } },
+        }),
+      );
+    });
+
+    it('rejects a field the schema does not define', async () => {
+      const layout = validLayout();
+      const sections = layout['sections'] as Record<string, Record<string, unknown>>;
+      await assertFails(
+        write({
+          ...layout,
+          sections: { ...sections, 'home-score': { ...sections['home-score'], rotate: 45 } },
+        }),
+      );
+    });
+
+    /**
+     * Deleting is how "reset to defaults" works, and it has to stay possible:
+     * writing defaults back would leave a board that merely resembles the stock
+     * scoreboard rather than being it.
+     */
+    it('lets an admin delete the layout entirely', async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await set(ref(ctx.database(), layoutPath(TENANT_A, BOARD_A1)), validLayout());
+      });
+
+      const db = as(UID_ADMIN_A, TENANT_A, 'admin');
+      await assertSucceeds(set(ref(db, layoutPath(TENANT_A, BOARD_A1)), null));
+    });
   });
 });

@@ -762,3 +762,196 @@ body {
     font-size: clamp(0.5rem, 1.5vw, 0.7rem);
   }
 }
+
+/* ===========================================================================
+   CUSTOM LAYOUT MODE
+   ===========================================================================
+
+   Everything below is inert until `display/shared/layoutApply.ts` puts
+   `.sb-custom` on `.scoreboard`, which it does only for a board that carries a
+   layout document. A board nobody has rearranged never matches a single
+   selector here, which is what lets "the scoreboard's appearance does not
+   change" stay literally true while the arrangement is still editable — and
+   what lets `tests/e2e/visual.spec.ts` keep its baselines.
+
+   The mechanism, since the units are unusual: `.scoreboard.sb-custom` is a
+   **size container**, so `1cqw`/`1cqh` inside it mean one percent of the board
+   box. Sections carry their geometry as unitless numbers in `--sb-x`/`--sb-y`/
+   `--sb-w`/`--sb-h` and are positioned with `calc(var(--sb-x) * 1cqw)`. Nothing
+   is measured in JavaScript and nothing recomputes on resize: the same document
+   is correct on a 4K gym screen and in a 300px editor preview.
+
+   Type follows the box. `--sb-unit` is the section's own height in pixels, and
+   every font-size below is a fraction of it, so making a box taller makes its
+   digits bigger — the only reading of "change the size" that makes sense on a
+   scoreboard. Several are additionally capped against the box *width*, because
+   a wide short box would otherwise render a team name straight out of its own
+   section. `--sb-s` is the operator's manual multiplier on top.
+   =========================================================================== */
+
+.scoreboard.sb-custom {
+  display: block;
+  position: relative;
+  /* Zero padding so the container-query box and the absolute-positioning box
+     are the same rectangle. With padding they differ — container units measure
+     the content box, `left`/`top` resolve against the padding box — and every
+     section would sit a padding's width off from where it was placed. */
+  padding: 0;
+  gap: 0;
+  container-type: size;
+  container-name: sb-board;
+}
+
+/* The three wrappers stop generating boxes, so their children become the
+   board's own absolutely-positioned children. `display: contents` rather than
+   unsetting the flex properties: an element with no box cannot be a containing
+   block, so every section resolves against `.scoreboard` without needing to
+   know how deeply the markup nests it. */
+.sb-custom .team,
+.sb-custom .center-console,
+.sb-custom .stats {
+  display: contents;
+}
+
+.sb-custom .sb-item {
+  --sb-unit: calc(var(--sb-h, 10) * 1cqh);
+  position: absolute;
+  left: calc(var(--sb-x, 0) * 1cqw);
+  top: calc(var(--sb-y, 0) * 1cqh);
+  width: calc(var(--sb-w, 10) * 1cqw);
+  height: calc(var(--sb-h, 10) * 1cqh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  min-width: 0;
+  max-height: none;
+  transform: none;
+}
+
+/* A caption switched off in the editor. */
+.sb-custom .sb-no-label .label,
+.sb-custom .sb-no-label .clock-label {
+  display: none;
+}
+
+/* --- Team names --- */
+
+.sb-custom .team-name {
+  font-size: calc(min(var(--sb-unit) * 0.52, var(--sb-w, 10) * 0.1cqw) * var(--sb-s, 1));
+  line-height: 1.1;
+  /* Room at both ends for the possession arrow, which sits inside the box in
+     this mode rather than hanging off its edge. */
+  padding: 0 1.3em;
+  overflow: hidden;
+}
+
+.sb-custom .possession-arrow {
+  font-size: calc(var(--sb-unit) * 0.3 * var(--sb-s, 1));
+}
+
+.sb-custom .team.home .possession-arrow {
+  right: 0.15em;
+  left: auto;
+}
+
+.sb-custom .team.away .possession-arrow {
+  left: 0.15em;
+  right: auto;
+}
+
+/* --- Scores --- */
+
+.sb-custom .score {
+  font-size: calc(min(var(--sb-unit) * 0.88, var(--sb-w, 10) * 0.62cqw) * var(--sb-s, 1));
+  line-height: 1;
+  border-radius: calc(var(--sb-unit) * 0.05);
+}
+
+/* --- Fouls and timeouts --- */
+
+.sb-custom .stat-line {
+  flex-direction: column;
+  gap: calc(var(--sb-unit) * 0.04);
+  width: 100%;
+  height: 100%;
+}
+
+.sb-custom .stat-line .label {
+  font-size: calc(var(--sb-unit) * 0.16 * var(--sb-s, 1));
+  margin: 0;
+}
+
+.sb-custom .stat-line .value {
+  font-size: calc(min(var(--sb-unit) * 0.56, var(--sb-w, 10) * 0.5cqw) * var(--sb-s, 1));
+  padding: 0.12em 0.22em;
+  min-width: 1.4em;
+}
+
+.sb-custom .stat-line.foul.bonus::after {
+  font-size: calc(var(--sb-unit) * 0.13 * var(--sb-s, 1));
+  margin-top: 0;
+}
+
+/* --- Clocks --- */
+
+.sb-custom .clock-container {
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--sb-unit) * 0.03);
+  width: 100%;
+  height: 100%;
+}
+
+.sb-custom .clock-label {
+  font-size: calc(var(--sb-unit) * 0.15 * var(--sb-s, 1));
+  margin: 0;
+  letter-spacing: 0.12em;
+}
+
+.sb-custom .game-clock {
+  font-size: calc(min(var(--sb-unit) * 0.6, var(--sb-w, 10) * 0.25cqw) * var(--sb-s, 1));
+  width: auto;
+  margin: 0;
+  padding: 0.08em 0.22em;
+  line-height: 1.08;
+}
+
+.sb-custom .shot-clock {
+  font-size: calc(min(var(--sb-unit) * 0.66, var(--sb-w, 10) * 0.5cqw) * var(--sb-s, 1));
+  width: auto;
+  padding: 0.06em 0.18em;
+}
+
+/* --- Period, logo, hint --- */
+
+.sb-custom .quarter-display {
+  font-size: calc(min(var(--sb-unit) * 0.56, var(--sb-w, 10) * 0.4cqw) * var(--sb-s, 1));
+  margin: 0;
+  padding: 0.12em 0.3em;
+  min-width: 0;
+}
+
+.sb-custom .logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+  margin: 0;
+}
+
+.sb-custom .controls-info {
+  font-size: calc(min(var(--sb-unit) * 0.5, var(--sb-w, 10) * 0.06cqw) * var(--sb-s, 1));
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* Last, so it outranks every `display` above — including `.sb-custom .logo`,
+   which the renderer hides whenever a board has no tournament image, and every
+   section an operator has taken off the board in the editor. */
+.sb-custom .sb-item[hidden] {
+  display: none;
+}

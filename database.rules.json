@@ -223,6 +223,77 @@
             }
           },
 
+          // How this board's sections are arranged on screen, when somebody
+          // has arranged them. Absent for the overwhelming majority of boards,
+          // and absent is not a gap to fill: it is the instruction to render
+          // the stock layout the scoreboard shipped with, which is why "reset
+          // to defaults" deletes this node rather than writing a default into
+          // it.
+          //
+          // Deliberately a sibling of `state` rather than a child. `state.rev`
+          // must advance by exactly one per write and every basket is a
+          // transaction against it; an admin dragging a box in the layout
+          // editor has no business competing with a scorer at the table for
+          // the same revision.
+          //
+          // Read by anyone who may read the board — the gym-wall scoreboard
+          // and the mirror both need it to paint, and the mirror holds only a
+          // board-scoped viewer token. Written by the roles that may run a
+          // game, because the arrangement of the board is part of operating
+          // it. The bounds below are hand-mirrored from LAYOUT_LIMITS in
+          // src/core/boardLayout.ts, the same way `state`'s are from LIMITS in
+          // schema.ts — there is no codegen link, so change one, change the
+          // other.
+          "layout": {
+            ".read": "auth != null && auth.token.tenantId === $tenantId && (auth.token.role === 'owner' || auth.token.role === 'admin' || auth.token.role === 'operator' || auth.token.role === 'viewer' || ((auth.token.role === 'overlay' || auth.token.role === 'mirror') && auth.token.boardId === $boardId))",
+
+            ".write": "auth != null && auth.token.tenantId === $tenantId && (auth.token.role === 'owner' || auth.token.role === 'admin' || auth.token.role === 'operator')",
+
+            ".validate": "newData.hasChildren(['version','sections'])",
+
+            "version": {
+              ".validate": "newData.isNumber() && newData.val() === 1"
+            },
+
+            "sections": {
+              "$sectionId": {
+                // scale, visible and showLabel are absent from this list on
+                // purpose: a layout written by an older build legitimately
+                // omits them, and parseBoardLayout fills each from the
+                // section's own default rather than from zero.
+                ".validate": "newData.hasChildren(['x','y','w','h'])",
+                "x": {
+                  ".validate": "newData.isNumber() && newData.val() >= -100 && newData.val() <= 200"
+                },
+                "y": {
+                  ".validate": "newData.isNumber() && newData.val() >= -100 && newData.val() <= 200"
+                },
+                "w": {
+                  ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 200"
+                },
+                "h": {
+                  ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 200"
+                },
+                "scale": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0.2 && newData.val() <= 3"
+                },
+                "visible": { ".validate": "newData.isBoolean()" },
+                "showLabel": { ".validate": "newData.isBoolean()" },
+                "$other": { ".validate": false }
+              }
+            },
+
+            "updatedAt": {
+              ".validate": "newData.isNumber() && newData.val() <= now + 120000 && newData.val() >= now - 600000"
+            },
+
+            "updatedBy": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+            },
+
+            "$other": { ".validate": false }
+          },
+
           "presence": {
             ".read": "auth != null && auth.token.tenantId === $tenantId && (auth.token.role === 'owner' || auth.token.role === 'admin' || auth.token.role === 'operator' || auth.token.role === 'viewer')",
             "$connectionId": {

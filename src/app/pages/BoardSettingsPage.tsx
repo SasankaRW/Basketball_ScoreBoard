@@ -158,6 +158,9 @@ export function BoardSettingsPage() {
           <p>Board settings</p>
         </div>
         <div className="page-head__actions">
+          <Link className="btn" to={`/app/boards/${board.id}/layout`}>
+            Layout
+          </Link>
           <Link className="btn" to={`/control/${board.id}`}>
             Control panel
           </Link>

@@ -14,6 +14,7 @@
  */
 import { createBuzzers } from '../../core/buzzer.js';
 import { remainingAt } from '../../core/clock.js';
+import { subscribeBoardLayout } from '../../core/liveLayout.js';
 import { dispatchWithRetry, subscribeBoardState } from '../../core/liveState.js';
 import type { Action } from '../../core/reducer.js';
 import { canControlBoard } from '../../core/roles.js';
@@ -28,6 +29,7 @@ import {
   type DisplayContext,
 } from '../shared/displayBoot.js';
 import { startDisplayLoop } from '../shared/displayLoop.js';
+import { applyLayout } from '../shared/layoutApply.js';
 import { queryScoreboardElements, renderScoreboard } from '../shared/scoreboardView.js';
 
 const IDLE_HINT = "Press 'H' for Help";
@@ -77,6 +79,26 @@ async function main(): Promise<void> {
       })
       .catch(() => hint('Change not saved — check the connection'));
   }
+
+  // -- Layout -------------------------------------------------------------
+
+  /**
+   * The arrangement an admin published for this board, or nothing at all.
+   *
+   * `applyLayout(_, null)` is not a no-op that happens to be harmless — it is
+   * the instruction that restores the stylesheet's own arrangement, which is
+   * what a board that has never been customised (and a board that was just
+   * reset) has to show. A failure to read is treated the same way: the stock
+   * scoreboard is the right thing to have on a wall when the layout document is
+   * unreachable.
+   */
+  subscribeBoardLayout(
+    db,
+    tenantId,
+    boardId,
+    (snapshot) => applyLayout(document, snapshot.layout),
+    () => applyLayout(document, null),
+  );
 
   // -- Live state ---------------------------------------------------------
 

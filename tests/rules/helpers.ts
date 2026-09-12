@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
+import { defaultLayout, type BoardLayout } from '../../src/core/boardLayout.js';
 import { createInitialState, DEFAULT_CONFIG, type BoardState } from '../../src/core/schema.js';
 import type { TimelineEvent } from '../../src/core/timeline.js';
 
@@ -29,6 +30,26 @@ export function statePath(tenantId: string, boardId: string): string {
 
 export function eventsPath(tenantId: string, boardId: string): string {
   return `live/${tenantId}/${boardId}/events`;
+}
+
+export function layoutPath(tenantId: string, boardId: string): string {
+  return `live/${tenantId}/${boardId}/layout`;
+}
+
+/**
+ * A layout document that satisfies every `.validate` rule.
+ *
+ * Built from `defaultLayout()` rather than hand-written, so the bounds in
+ * `database.rules.json` are tested against the shape the app actually writes —
+ * the two are hand-mirrored, and this is where a drift between them surfaces.
+ */
+export function validLayout(overrides: Partial<BoardLayout> = {}): Record<string, unknown> {
+  return {
+    ...defaultLayout(),
+    updatedAt: Date.now(),
+    updatedBy: UID_OPERATOR_A,
+    ...overrides,
+  };
 }
 
 /** A timeline entry that satisfies every `.validate` rule. */
@@ -78,7 +99,7 @@ export async function createTestEnv(): Promise<RulesTestEnvironment> {
     database: {
       rules: readFileSync(resolve(root, 'database.rules.json'), 'utf8'),
       host: '127.0.0.1',
-      port: 9000,
+      port: 9010,
     },
     storage: {
       rules: readFileSync(resolve(root, 'storage.rules'), 'utf8'),

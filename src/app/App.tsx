@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthProvider.js';
 import { Spinner } from './components/ui.js';
+import { BoardLayoutPage } from './pages/BoardLayoutPage.js';
 import { BoardSettingsPage } from './pages/BoardSettingsPage.js';
 import { ControlPanelPage } from './pages/ControlPanelPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -78,6 +79,14 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <BoardSettingsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/app/boards/:boardId/layout"
+          element={
+            <RequireAuth>
+              <BoardLayoutPage />
             </RequireAuth>
           }
         />

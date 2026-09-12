@@ -1993,3 +1993,360 @@ textarea:focus {
 .nowrap {
   white-space: nowrap;
 }
+
+/* ------------------------------------------------------ scoreboard layout */
+/*
+   The layout editor: a scaled preview of the real display on the left, a
+   property panel on the right. The preview is an iframe of this board's mirror,
+   so everything drawn over it has to line up with a document this stylesheet
+   cannot reach — which is why the overlay is positioned in JavaScript from the
+   board rect the frame reports, and why nothing here sets a position itself.
+*/
+
+.layout-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .layout-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.layout-editor__stage {
+  position: relative;
+  min-width: 0;
+}
+
+.layout-editor__hint {
+  margin: var(--space-3) 0 0;
+  font-size: 0.8rem;
+}
+
+.layout-editor__hint kbd {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.1em 0.4em;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.layout-editor__intro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  text-align: center;
+  border-radius: var(--radius);
+  /* Dimmed rather than opaque: the point of the panel is to say the board below
+     is the real, untouched one. */
+  background: rgba(5, 5, 5, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.layout-editor__intro p {
+  max-width: 32rem;
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* --- Canvas --- */
+
+.layout-canvas {
+  width: 100%;
+}
+
+.layout-canvas__stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: #000;
+}
+
+/* The frame and the overlay are both laid out at the frame's own 1280px
+   viewport and then scaled together, so a box placed at 40% of the board lands
+   on the same pixel in both. Scaling only one of them is the bug this pairing
+   exists to prevent. */
+.layout-canvas__frame,
+.layout-canvas__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
+
+.layout-canvas__frame {
+  border: 0;
+  /* Every pointer event belongs to the overlay. The mirror binds no input, but
+     a click landing in the frame would still steal focus from the handles. */
+  pointer-events: none;
+}
+
+.layout-canvas__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-faint);
+}
+
+/* The overlay itself is transparent to the pointer so a click on bare board
+   deselects; the boxes inside it opt back in. */
+.layout-canvas__overlay {
+  pointer-events: none;
+}
+
+.layout-box {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  border: 1px solid rgba(90, 175, 232, 0.35);
+  border-radius: 4px;
+  background: rgba(52, 152, 219, 0.04);
+  transition:
+    border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease);
+}
+
+.layout-box:hover {
+  border-color: rgba(90, 175, 232, 0.8);
+  background: rgba(52, 152, 219, 0.1);
+}
+
+.layout-box:active {
+  cursor: grabbing;
+}
+
+.layout-box.is-selected {
+  border-color: var(--yellow);
+  background: rgba(241, 196, 15, 0.08);
+}
+
+.layout-box:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.layout-box__tag {
+  position: absolute;
+  top: -1.15rem;
+  left: 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+  pointer-events: none;
+}
+
+.layout-box:hover .layout-box__tag,
+.layout-box.is-selected .layout-box__tag {
+  opacity: 1;
+}
+
+.layout-box.is-selected .layout-box__tag {
+  color: var(--yellow);
+}
+
+.layout-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--yellow);
+  border: 1px solid #050505;
+  border-radius: 2px;
+  pointer-events: auto;
+}
+
+.layout-handle--nw {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+.layout-handle--n {
+  top: -5px;
+  left: calc(50% - 5px);
+  cursor: ns-resize;
+}
+.layout-handle--ne {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+.layout-handle--e {
+  top: calc(50% - 5px);
+  right: -5px;
+  cursor: ew-resize;
+}
+.layout-handle--se {
+  bottom: -5px;
+  right: -5px;
+  cursor: nwse-resize;
+}
+.layout-handle--s {
+  bottom: -5px;
+  left: calc(50% - 5px);
+  cursor: ns-resize;
+}
+.layout-handle--sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+.layout-handle--w {
+  top: calc(50% - 5px);
+  left: -5px;
+  cursor: ew-resize;
+}
+
+/* Guides are drawn and moved imperatively during a drag — no React render is
+   involved, which is what keeps a 60Hz gesture at 60Hz. */
+.layout-guide {
+  position: absolute;
+  background: var(--red);
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.8);
+  pointer-events: none;
+}
+
+.layout-guide--x {
+  width: 1px;
+}
+
+.layout-guide--y {
+  height: 1px;
+}
+
+.layout-readout {
+  position: absolute;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: #050505;
+  background: var(--yellow);
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* --- Panel --- */
+
+.layout-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  position: sticky;
+  top: var(--space-4);
+}
+
+@media (max-width: 1100px) {
+  .layout-panel {
+    position: static;
+  }
+}
+
+.layout-panel__block {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.layout-panel__block h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.layout-panel__group h3 {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.layout-panel__label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.layout-panel__segmented {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.layout-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.layout-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.layout-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.layout-list__name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-list__name:hover {
+  background: var(--surface-hover);
+}
+
+.layout-list__name.is-selected {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  background: var(--yellow-bg);
+}
+
+.layout-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

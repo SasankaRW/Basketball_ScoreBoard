@@ -24,7 +24,7 @@ import {
 } from '../../core/boards.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
 import { finishMatch } from '../../core/matches.js';
-import { canControlBoard, canManageBoards } from '../../core/roles.js';
+import { canControlBoard, canManageBoards, canManageTenantSettings } from '../../core/roles.js';
 import {
   commandForKey,
   COMMANDS,
@@ -34,6 +34,11 @@ import {
   type Keymap,
 } from '../../core/keymap.js';
 import { clearKeymap, readKeymap, writeKeymap } from '../keymapStorage.js';
+import {
+  isWorthSeeding,
+  subscribeTenantKeymap,
+  writeTenantKeymap,
+} from '../../core/tenantKeymap.js';
 import {
   isInBonus,
   LIMITS,
@@ -79,28 +84,93 @@ export function ControlPanelPage() {
   const [viewingShortcuts, setViewingShortcuts] = useState(false);
 
   /**
-   * The operator's own shortcuts, read once per signed-in user.
+   * The tenant's shared shortcut layout.
    *
-   * Seeded lazily so a blocked or empty `localStorage` costs nothing on every
-   * later render, and keyed by uid inside the store — a shared courtside laptop
-   * must not hand one scorer's layout to the next person who signs in.
+   * Starts from this browser's cache so the keys work during the first round
+   * trip — a panel that scored on `P` a second ago must not answer the arrow
+   * keys while a snapshot is in flight — then follows the tenant document,
+   * which is the real source of truth and reaches every open panel when an
+   * admin changes it.
    */
-  const [keymap, setKeymap] = useState<Keymap>(() => readKeymap(session.uid));
+  const canEditKeymap = canManageTenantSettings(session.role);
+  const [keymap, setKeymap] = useState<Keymap>(() => readKeymap(session.tenantId, session.uid));
 
-  useEffect(() => setKeymap(readKeymap(session.uid)), [session.uid]);
+  /**
+   * Adoption is once per tenant, and `seeded` is what makes it once: the
+   * write below re-enters this effect through its own snapshot, and without
+   * the guard a tenant deliberately reset to the defaults would be re-seeded
+   * from this cache on the next render.
+   */
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    seeded.current = false;
+    setKeymap(readKeymap(session.tenantId, session.uid));
+
+    return subscribeTenantKeymap(
+      getFirestoreClient(),
+      session.tenantId,
+      (shared) => {
+        if (shared) {
+          setKeymap(shared);
+          // Keep the cache honest, so the next cold open starts on the
+          // tenant's layout rather than this browser's history.
+          writeKeymap(session.tenantId, session.uid, shared);
+          return;
+        }
+
+        // Nothing saved for the tenant yet. Carry this browser's customised
+        // layout up, if there is one and this member may write it; everyone
+        // else simply keeps scoring on the cache until an admin does.
+        if (seeded.current || !canEditKeymap) return;
+        seeded.current = true;
+
+        const local = readKeymap(session.tenantId, session.uid);
+        if (!isWorthSeeding(local)) return;
+        void writeTenantKeymap(getFirestoreClient(), session.tenantId, local).catch(() => {
+          // A failed adoption is not worth an error in front of an operator
+          // mid-game: the layout still works from the cache, and the next
+          // deliberate edit reports its own failure.
+        });
+      },
+      () => {
+        // Unreadable tenant document — stay on the cached layout rather than
+        // dropping an operator back onto keys they have stopped using.
+      },
+    );
+  }, [session.tenantId, session.uid, canEditKeymap]);
+
+  const [keymapError, setKeymapError] = useState<string | null>(null);
 
   const changeKeymap = useCallback(
     (next: Keymap) => {
+      // Applied locally first, then published. The editor stays responsive on
+      // a slow connection, and the cache means a failed write still leaves the
+      // operator on the keys they just chose for the rest of the session.
       setKeymap(next);
-      writeKeymap(session.uid, next);
+      writeKeymap(session.tenantId, session.uid, next);
+      setKeymapError(null);
+      void writeTenantKeymap(getFirestoreClient(), session.tenantId, next).catch(() => {
+        setKeymapError(
+          'That shortcut is saved on this computer, but could not be saved for the organisation.',
+        );
+      });
     },
-    [session.uid],
+    [session.tenantId, session.uid],
   );
 
   const resetKeymap = useCallback(() => {
-    setKeymap(defaultKeymap());
-    clearKeymap(session.uid);
-  }, [session.uid]);
+    const defaults = defaultKeymap();
+    setKeymap(defaults);
+    clearKeymap(session.tenantId, session.uid);
+    setKeymapError(null);
+    // Written rather than deleted: an explicit "back to the shipped keys" is a
+    // decision the tenant has made, and clearing the field would instead
+    // re-arm adoption from whichever browser opened the panel next.
+    void writeTenantKeymap(getFirestoreClient(), session.tenantId, defaults).catch(() => {
+      setKeymapError('Shortcuts were reset on this computer, but not for the organisation.');
+    });
+  }, [session.tenantId, session.uid]);
 
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
@@ -305,13 +375,34 @@ export function ControlPanelPage() {
 
     const onMouseDown = (event: MouseEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.button === 0 || isTextField(event.target)) return;
+      // The bare left click belongs to the panel's own buttons and links, so
+      // only `Mouse0` *with* Shift reaches a keymap lookup — which is also the
+      // only binding `isBindableCode` will produce for it.
+      if ((event.button === 0 && !event.shiftKey) || isTextField(event.target)) return;
 
       const command = commandForKey(keymap, `Mouse${event.button}`, event.shiftKey);
       if (!command) return;
 
       commands[command]();
       event.preventDefault();
+    };
+
+    // `preventDefault` on a mousedown does not stop the `click` that follows
+    // it, so a bound Shift + left click landing on one of the panel's own
+    // buttons would run the shortcut *and* whatever that button does. Killing
+    // the click is what keeps a shortcut a shortcut. Re-derived rather than
+    // flagged from the mousedown, so an aborted press (drag away, release
+    // elsewhere) leaves nothing armed behind it.
+    const onClick = (event: MouseEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // A keyboard-activated button dispatches a `click` with no mouse behind
+      // it (`detail` 0) — that press is the key handler's business, not this.
+      if (event.detail === 0 || event.button !== 0 || !event.shiftKey) return;
+      if (isTextField(event.target)) return;
+      if (!commandForKey(keymap, 'Mouse0', true)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
     };
 
     // `contextmenu` fires independently of `mousedown` — the browser still
@@ -323,10 +414,12 @@ export function ControlPanelPage() {
 
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('click', onClick, true);
     document.addEventListener('contextmenu', onContextMenu);
     return () => {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('click', onClick, true);
       document.removeEventListener('contextmenu', onContextMenu);
     };
   }, [commands, keymap, readOnly, state, tourRunning, modalOpen]);
@@ -492,6 +585,8 @@ export function ControlPanelPage() {
       {editingShortcuts ? (
         <ShortcutEditor
           keymap={keymap}
+          canEdit={canEditKeymap}
+          error={keymapError}
           onChange={changeKeymap}
           onReset={resetKeymap}
           onClose={() => setEditingShortcuts(false)}

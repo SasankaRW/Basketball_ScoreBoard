@@ -5,6 +5,13 @@
  * arms a capture: the next keypress becomes that command's shortcut, so nobody
  * has to know that the key next to the left Shift is called `Backquote`.
  *
+ * The layout is a tenant setting, shared by the whole organisation, so this
+ * editor is read-only for anyone below admin — `canEdit` reflects
+ * `canManageTenantSettings`, the same split the security rules enforce on
+ * `settings.keymap`. A read-only editor still lists every binding, because an
+ * operator needs to *see* the keys they are scoring with even when changing
+ * them is not theirs to do.
+ *
  * Capturing listens on the document in the **capture phase** and stops the
  * event there. Two things are downstream that must not see these keys — the
  * `Modal`'s own Escape-to-close handler, and the control panel's live
@@ -23,20 +30,25 @@ import {
   isBindableCode,
   isDefaultKeymap,
   isModifierCode,
+  isShiftOnlyCode,
   withBinding,
   withoutBinding,
   type CommandId,
   type Keymap,
 } from '../../core/keymap.js';
-import { Modal } from './ui.js';
+import { Alert, Modal } from './ui.js';
 
 export function ShortcutEditor({
   keymap,
+  canEdit,
+  error,
   onChange,
   onReset,
   onClose,
 }: {
   keymap: Keymap;
+  canEdit: boolean;
+  error: string | null;
   onChange: (keymap: Keymap) => void;
   onReset: () => void;
   onClose: () => void;
@@ -56,8 +68,12 @@ export function ShortcutEditor({
         );
         return;
       }
-      if (!isBindableCode(code)) {
-        setNotice(`${formatCode(code)} cannot be used as a shortcut.`);
+      if (!isBindableCode(code, shift)) {
+        setNotice(
+          isShiftOnlyCode(code)
+            ? `${formatCode(code)} presses the buttons on this page — hold Shift and use it for a Shift + ${formatCode(code)} shortcut.`
+            : `${formatCode(code)} cannot be used as a shortcut.`,
+        );
         return;
       }
 
@@ -90,11 +106,18 @@ export function ShortcutEditor({
     };
 
     const onMouseDown = (event: MouseEvent) => {
-      // The plain left click is never bindable (see isBindableCode) and is
-      // also how this editor is itself operated — leaving it alone is what
-      // lets someone click a different row's "Change", or "Done", instead of
-      // pressing Escape to get out of a capture they no longer want.
-      if (event.button === 0) return;
+      // The bare left click is how this editor is itself operated — letting it
+      // through is what lets someone click a different row's "Change", or
+      // "Done", instead of pressing Escape to get out of a capture they no
+      // longer want. So it is not swallowed, and cannot be bound; it only
+      // leaves behind the hint that Shift is what makes it bindable. Every
+      // control that reacts to that same click clears the notice again
+      // (`assign` and `clear` both do), so the hint survives only a click that
+      // did nothing else.
+      if (event.button === 0 && !event.shiftKey) {
+        setNotice('Left click presses the buttons on this page — hold Shift and click to bind it.');
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       tryBind(`Mouse${event.button}`, event.shiftKey, event.metaKey, event.ctrlKey, event.altKey);
@@ -135,6 +158,7 @@ export function ShortcutEditor({
           <button
             type="button"
             className="btn"
+            hidden={!canEdit}
             disabled={isDefaultKeymap(keymap)}
             onClick={() => {
               setNotice(null);
@@ -151,13 +175,27 @@ export function ShortcutEditor({
       }
     >
       <p className="field__hint shortcut-editor__intro">
-        Press <strong>Change</strong>, then press the key or click the mouse button you want. Hold
-        Shift while you do it for a Shift shortcut. These are saved in this browser, for you.
+        {canEdit ? (
+          <>
+            Press <strong>Change</strong>, then press the key or click the mouse button you want.
+            Hold Shift while you do it for a Shift shortcut — left click is the one button that
+            needs Shift, since on its own it is what presses the buttons on this page. These are
+            saved for your whole organisation, on every board.
+          </>
+        ) : (
+          <>
+            These shortcuts are set for your whole organisation. An owner or admin can change them;
+            they then apply on every board, for everyone.
+          </>
+        )}
       </p>
+
+      {error ? <Alert kind="error">{error}</Alert> : null}
 
       {capturing ? (
         <p className="shortcut-editor__prompt" role="status">
-          Press a key or click a mouse button for “{commandLabel(capturing)}” — Escape to cancel.
+          Press a key or click a mouse button for “{commandLabel(capturing)}” — Shift + click for
+          left click — Escape to cancel.
         </p>
       ) : null}
 
@@ -183,23 +221,27 @@ export function ShortcutEditor({
                 >
                   {armed ? 'Press a key…' : formatBinding(binding)}
                 </kbd>
-                <button
-                  type="button"
-                  className="btn btn--sm"
-                  aria-label={`Change shortcut for ${command.label}`}
-                  onClick={() => assign(command.id)}
-                >
-                  Change
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  aria-label={`Clear shortcut for ${command.label}`}
-                  disabled={!binding}
-                  onClick={() => clear(command.id)}
-                >
-                  Clear
-                </button>
+                {canEdit ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      aria-label={`Change shortcut for ${command.label}`}
+                      onClick={() => assign(command.id)}
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      aria-label={`Clear shortcut for ${command.label}`}
+                      disabled={!binding}
+                      onClick={() => clear(command.id)}
+                    >
+                      Clear
+                    </button>
+                  </>
+                ) : null}
                 {bindingsEqual(binding, command.defaultBinding) ? null : (
                   <span className="shortcut-editor__changed" aria-hidden="true">
                     •

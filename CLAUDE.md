@@ -80,15 +80,39 @@ plain HTTP functions get no equivalent of the callable-functions handshake.
 
 **Control-panel shortcuts are data, not a `switch`.** `src/core/keymap.ts` owns
 the command catalog (`score.home.plus1`, …), the shipped defaults, and the
-conflict rules; `ControlPanelPage` maps each command to what its button does,
-and `src/app/keymapStorage.ts` persists an operator's edits to `localStorage`
-per uid — like `tour/progress.ts`, and for the same reasons (a property of this
-browser, no security-rules surface). One key drives exactly one command, so
-assigning a key that is in use _takes_ it and the editor says which command lost
-it. Two consequences worth knowing: matching is exact on `code` + `shift`, so
-`Shift+↑` no longer falls through to `↑` the way the old switch let it; and the
-scoreboard display (`src/display/scoreboard/main.ts`) still has its own
-hard-coded keys, so a remapped panel and the gym-wall board no longer agree.
+conflict rules; `ControlPanelPage` maps each command to what its button does.
+One key drives exactly one command, so assigning a key that is in use _takes_ it
+and the editor says which command lost it. Matching is exact on `code` +
+`shift`, so `Shift+↑` no longer falls through to `↑` the way the old switch let
+it — and the scoreboard display (`src/display/scoreboard/main.ts`) still has its
+own hard-coded keys, so a remapped panel and the gym-wall board no longer agree.
+
+Mouse buttons bind through the same `code`/`shift` pair, as a synthetic
+`MouseN` (`N` is `MouseEvent.button`). `Mouse0` is the exception: the bare left
+click is what presses every button on the page and dispatch listens on the
+_document_, so it binds **only with Shift held** (`SHIFT_ONLY` in `keymap.ts`,
+which is why `isBindableCode` takes `shift` and every caller must pass it).
+`preventDefault` on a mousedown does not stop the `click` that follows, so
+`ControlPanelPage` swallows that click separately — without it, a bound
+`Shift`+click on a panel button would run the shortcut _and_ the button.
+
+**The layout is a tenant setting, not a browser one.** It lives at
+`settings.keymap` on the tenant document: every member reads it (`allow get: if
+inTenant(tid)`), owner/admin alone write it, which is `canManageTenantSettings`.
+It is on the tenant document rather than in a collection of its own precisely
+because `settings` is _already_ in that document's `onlyChanges` allowlist — so
+a shared keymap added no new rule and no new tenant-isolation surface to prove
+(`tests/rules/firestore.test.ts` pins the inheritance anyway). Writes go through
+the dotted path `settings.keymap` so they merge; a whole-`settings` write would
+drop every other tenant setting. Command ids contain dots but appear only as map
+_keys_ in the value, never in the path.
+
+`src/app/keymapStorage.ts` is now a **cache**, keyed per tenant *and* per uid
+(`v2`): it is what the panel scores with before the first snapshot lands, and it
+is the seed — a tenant that has never saved a layout adopts the cached one the
+first time an admin opens the panel, guarded by a `seeded` ref so a tenant
+deliberately reset to the defaults is not re-seeded. Reset therefore _writes_
+the defaults rather than deleting the field, which would re-arm that adoption.
 
 **Display surfaces are deliberately minimal.** `src/display/` is vanilla
 TypeScript — no React, no Firestore — because a gym-wall screen and an OBS

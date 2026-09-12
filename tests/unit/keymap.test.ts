@@ -21,6 +21,7 @@ import {
   isBindableCode,
   isDefaultKeymap,
   isModifierCode,
+  isShiftOnlyCode,
   parseKeymap,
   withBinding,
   withoutBinding,
@@ -164,10 +165,12 @@ describe('binding a key', () => {
 });
 
 describe('bindable keys', () => {
-  it.each(['Escape', 'Tab', 'ShiftLeft', 'ControlRight', 'MetaLeft', 'F5', 'F11', 'F12', 'Mouse0'])(
+  it.each(['Escape', 'Tab', 'ShiftLeft', 'ControlRight', 'MetaLeft', 'F5', 'F11', 'F12'])(
     'refuses %s',
     (code) => {
       expect(isBindableCode(code)).toBe(false);
+      // Shift does not rescue these — an unbindable code is unbindable.
+      expect(isBindableCode(code, true)).toBe(false);
     },
   );
 
@@ -180,11 +183,52 @@ describe('bindable keys', () => {
 
   /**
    * Mouse buttons bind through the same `code` string as a key — `Mouse0` (the
-   * plain left click every button on the page is pressed with) is the one
-   * exception, refused so a bound shortcut can never fire on an ordinary click.
+   * left click every button on the page is pressed with) is the one exception,
+   * bindable only with Shift held so no bound shortcut can fire on an ordinary
+   * click.
    */
   it.each(['Mouse1', 'Mouse2', 'Mouse3', 'Mouse4'])('accepts mouse button %s', (code) => {
     expect(isBindableCode(code)).toBe(true);
+  });
+
+  it('accepts the left click only with Shift held', () => {
+    expect(isBindableCode('Mouse0')).toBe(false);
+    expect(isBindableCode('Mouse0', true)).toBe(true);
+    expect(isShiftOnlyCode('Mouse0')).toBe(true);
+  });
+
+  it.each(['Mouse1', 'Mouse2', 'KeyA', 'Escape'])('does not treat %s as shift-only', (code) => {
+    expect(isShiftOnlyCode(code)).toBe(false);
+  });
+
+  it('binds and looks up Shift + left click', () => {
+    const binding = { code: 'Mouse0', shift: true };
+    const { keymap } = withBinding(defaultKeymap(), 'score.home.plus1', binding);
+    expect(commandForKey(keymap, 'Mouse0', true)).toBe('score.home.plus1');
+    // The bare click must stay inert, or every press of a panel button scores.
+    expect(commandForKey(keymap, 'Mouse0', false)).toBeNull();
+  });
+
+  it('keeps a stored Shift + left click across a round trip', () => {
+    const { keymap } = withBinding(defaultKeymap(), 'score.home.plus1', {
+      code: 'Mouse0',
+      shift: true,
+    });
+    expect(parseKeymap(JSON.parse(JSON.stringify(keymap)))['score.home.plus1']).toEqual({
+      code: 'Mouse0',
+      shift: true,
+    });
+  });
+
+  /**
+   * Only reachable from hand-edited storage — the editor has never let a bare
+   * left click through. It lands unbound rather than back on its default, the
+   * same way a stored `null` does: a keymap that named a binding, even a bad
+   * one, is not a keymap asking for the shipped key back.
+   */
+  it('drops a stored bare left click', () => {
+    const stored = { ...defaultKeymap(), 'score.home.plus1': { code: 'Mouse0', shift: false } };
+    expect(parseKeymap(stored)['score.home.plus1']).toBeNull();
   });
 
   it('binds and looks up a mouse button like any other code', () => {
@@ -281,6 +325,7 @@ describe('display', () => {
     ['Slash', '/'],
     ['Numpad7', 'Num 7'],
     ['F2', 'F2'],
+    ['Mouse0', 'Left click'],
     ['Mouse1', 'Middle click'],
     ['Mouse2', 'Right click'],
     ['Mouse3', 'Back button'],
