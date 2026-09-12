@@ -6,9 +6,11 @@ import { ControlPanelPage } from './pages/ControlPanelPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { HistoryPage } from './pages/HistoryPage.js';
 import { JoinPage } from './pages/JoinPage.js';
+import { LiveGamesPage } from './pages/LiveGamesPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { ProvisioningPage } from './pages/ProvisioningPage.js';
 import { SchedulePage } from './pages/SchedulePage.js';
+import { SiteAdminPage } from './pages/SiteAdminPage.js';
 import { TourProvider } from './tour/TourProvider.js';
 import type { ReactNode } from 'react';
 
@@ -92,6 +94,27 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <HistoryPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/app/live"
+          element={
+            <RequireAuth>
+              <LiveGamesPage />
+            </RequireAuth>
+          }
+        />
+        {/*
+          Deliberately not under /app and not linked from any nav — reachable
+          only by whoever knows this URL. The server checks who is actually
+          allowed to see anything; this route just needs a signed-in user.
+        */}
+        <Route
+          path="/siteadmin"
+          element={
+            <RequireAuth>
+              <SiteAdminPage />
             </RequireAuth>
           }
         />

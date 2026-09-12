@@ -6,7 +6,7 @@ import { Tour } from '../tour/Tour.js';
 import { useTour } from '../tour/TourProvider.js';
 import { IconHelp } from './icons.js';
 import { RoleBadge } from './ui.js';
-import { isMemberRole } from '../../core/roles.js';
+import { canViewLiveGames, isMemberRole } from '../../core/roles.js';
 
 export function AppShell({ tenantName, children }: { tenantName: string; children: ReactNode }) {
   const { state, signOut } = useAuth();
@@ -34,6 +34,11 @@ export function AppShell({ tenantName, children }: { tenantName: string; childre
           <NavLink to="/app/history" className="topbar__navlink">
             History
           </NavLink>
+          {session && canViewLiveGames(session.role) ? (
+            <NavLink to="/app/live" className="topbar__navlink">
+              Live
+            </NavLink>
+          ) : null}
         </nav>
 
         <div className="topbar__spacer" />

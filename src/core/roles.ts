@@ -60,6 +60,16 @@ export function canViewAudit(role: Role | null | undefined): boolean {
   return atLeast(role, 'admin');
 }
 
+/**
+ * See every board's live score/clock/period from one screen, without opening
+ * each board individually. Purely a read of data every member role can
+ * already read (`canViewBoard`) — this only narrows who the *summary page*
+ * is offered to, the same way `canViewAudit` narrows the activity log.
+ */
+export function canViewLiveGames(role: Role | null | undefined): boolean {
+  return atLeast(role, 'admin');
+}
+
 export function canManageTenantSettings(role: Role | null | undefined): boolean {
   return atLeast(role, 'admin');
 }
