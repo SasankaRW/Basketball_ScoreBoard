@@ -107,7 +107,7 @@ the dotted path `settings.keymap` so they merge; a whole-`settings` write would
 drop every other tenant setting. Command ids contain dots but appear only as map
 _keys_ in the value, never in the path.
 
-`src/app/keymapStorage.ts` is now a **cache**, keyed per tenant *and* per uid
+`src/app/keymapStorage.ts` is now a **cache**, keyed per tenant _and_ per uid
 (`v2`): it is what the panel scores with before the first snapshot lands, and it
 is the seed — a tenant that has never saved a layout adopts the cached one the
 first time an admin opens the panel, guarded by a `seeded` ref so a tenant

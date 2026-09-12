@@ -99,7 +99,7 @@ export async function createTestEnv(): Promise<RulesTestEnvironment> {
     database: {
       rules: readFileSync(resolve(root, 'database.rules.json'), 'utf8'),
       host: '127.0.0.1',
-      port: 9010,
+      port: 9000,
     },
     storage: {
       rules: readFileSync(resolve(root, 'storage.rules'), 'utf8'),
