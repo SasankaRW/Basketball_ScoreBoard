@@ -302,3 +302,31 @@ export async function startScheduledMatch(
 
   return { boardId };
 }
+
+// ---------------------------------------------------------------------------
+// One route for both — a Vercel deployment cap, not a design choice
+// ---------------------------------------------------------------------------
+
+/**
+ * `finishMatch` and `startScheduledMatch` share one Vercel function
+ * (`api/match.ts`), dispatched on `op`, rather than one route each.
+ *
+ * Not the "one thin route per operation" norm the rest of `api/` follows —
+ * the Hobby plan's 12-function-per-deployment cap is what forces the
+ * exception, not a change of mind about the pattern. Both functions above
+ * stay separate and independently callable; this is purely a routing-layer
+ * merge, picked because the two already share both an auth level (`operator`)
+ * and this file.
+ */
+export const MatchActionInput = z.discriminatedUnion('op', [
+  FinishMatchInput.extend({ op: z.literal('finish') }),
+  StartScheduledMatchInput.extend({ op: z.literal('start') }),
+]);
+
+export async function handleMatchAction(
+  caller: Caller,
+  input: z.infer<typeof MatchActionInput>,
+): Promise<{ matchId: string } | { boardId: string }> {
+  if (input.op === 'finish') return finishMatch(caller, input);
+  return startScheduledMatch(caller, input);
+}

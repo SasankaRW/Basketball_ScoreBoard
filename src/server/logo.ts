@@ -8,6 +8,13 @@
  * that field) and still dispatches `LOGO_URL_SET` to put it on the game in
  * progress. This route's only job is turning uploaded bytes into a URL, or
  * removing the one that is there.
+ *
+ * Upload and remove share one Vercel function (`api/logo.ts`), dispatched on
+ * `op`, rather than one route each. Not the "one thin route per operation"
+ * norm the rest of `api/` follows — the Hobby plan's 12-function-per-
+ * deployment cap is what forces the exception here, not a change of mind
+ * about the pattern; `uploadLogo`/`removeLogo` stay separate, independently
+ * callable functions underneath, so this is purely a routing-layer merge.
  */
 import { z } from 'zod';
 import { LOGO_LIMITS } from '../core/storage.js';
@@ -111,4 +118,19 @@ export async function removeLogo(
   });
 
   return { removed: true };
+}
+
+/** What `api/logo.ts` actually validates — `uploadLogo`/`removeLogo`'s own
+ * input schemas plus the `op` discriminant that picks between them. */
+export const LogoActionInput = z.discriminatedUnion('op', [
+  UploadLogoInput.extend({ op: z.literal('upload') }),
+  RemoveLogoInput.extend({ op: z.literal('remove') }),
+]);
+
+export async function handleLogoAction(
+  caller: Caller,
+  input: z.infer<typeof LogoActionInput>,
+): Promise<UploadLogoResult | { removed: true }> {
+  if (input.op === 'upload') return uploadLogo(caller, input);
+  return removeLogo(caller, input);
 }

@@ -115,5 +115,8 @@ export function subscribeMatch(
 }
 
 export async function finishMatch(boardId: string): Promise<{ matchId: string }> {
-  return callApi<{ matchId: string }>('finishMatch', { boardId });
+  // `'match'`, not `'finishMatch'` — finishing and starting a scheduled match
+  // share one Vercel function (api/match.ts) to stay under the Hobby plan's
+  // 12-function cap; see src/server/matches.ts's handleMatchAction.
+  return callApi<{ matchId: string }>('match', { op: 'finish', boardId });
 }

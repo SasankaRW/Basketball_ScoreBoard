@@ -3,16 +3,18 @@
  * place of a hardcoded default. One canonical asset per board — re-uploading
  * overwrites it — mirroring the path `src/server/logo.ts` uploads it under.
  *
- * Uploaded through `api/uploadLogo` to Cloudinary rather than to Firebase
- * Storage. Storage needs the paid Blaze plan, which is what blocked this
- * feature outright (this module used to carry a `LOGO_UPLOAD_ENABLED` flag
- * for exactly that reason — see git history). Cloudinary needs only a free
+ * Uploaded through `api/logo` to Cloudinary rather than to Firebase Storage.
+ * Storage needs the paid Blaze plan, which is what blocked this feature
+ * outright (this module used to carry a `LOGO_UPLOAD_ENABLED` flag for
+ * exactly that reason — see git history). Cloudinary needs only a free
  * account, and the credential that actually authorises an upload is an API
  * secret that must never reach a browser, so the upload itself happens
  * server-side (`src/server/cloudinary.ts`) the same way every other
  * privileged write in this app goes through `api/*.ts` rather than straight
  * from the client — this module only validates the file and hands its bytes
- * to that endpoint.
+ * to that endpoint. Upload and remove are one `op`-discriminated endpoint
+ * rather than two — a Vercel Hobby-plan deployment caps out at 12 serverless
+ * functions, and this app was already at that ceiling.
  *
  * `LOGO_LIMITS` is validated here before the upload even starts (fail fast,
  * no wasted round trip) and re-validated server-side against the same
@@ -75,7 +77,8 @@ export async function uploadBoardLogo(boardId: string, file: File): Promise<stri
   if (invalid) throw new Error(invalid);
 
   const dataBase64 = await readAsBase64(file);
-  const { logoUrl } = await callApi<UploadLogoResult>('uploadLogo', {
+  const { logoUrl } = await callApi<UploadLogoResult>('logo', {
+    op: 'upload',
     boardId,
     contentType: file.type,
     dataBase64,
@@ -85,5 +88,5 @@ export async function uploadBoardLogo(boardId: string, file: File): Promise<stri
 
 /** Best-effort on the server side too: a logo already removed is not an error. */
 export async function removeBoardLogo(boardId: string): Promise<void> {
-  await callApi('removeLogo', { boardId });
+  await callApi('logo', { op: 'remove', boardId });
 }
