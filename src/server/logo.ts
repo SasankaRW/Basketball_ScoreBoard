@@ -15,9 +15,19 @@
  * deployment cap is what forces the exception here, not a change of mind
  * about the pattern; `uploadLogo`/`removeLogo` stay separate, independently
  * callable functions underneath, so this is purely a routing-layer merge.
+ *
+ * `LOGO_LIMITS` comes from `core/logoLimits.ts`, deliberately not from
+ * `core/storage.ts` even though the same constant is exported from there too:
+ * `storage.ts` also imports `callApi` (→ `firebase.ts`, which reads
+ * `import.meta.env` at module scope — a Vite-only construct). An ES import
+ * pulls in a module's *entire* graph, not just the one export named, so
+ * importing `LOGO_LIMITS` from `storage.ts` would drag that whole chain into
+ * this serverless function's bundle and crash it at cold start, nowhere near
+ * the line that actually needed the constant. Reach for `logoLimits.ts`
+ * directly for anything imported from `src/server/`.
  */
 import { z } from 'zod';
-import { LOGO_LIMITS } from '../core/storage.js';
+import { LOGO_LIMITS } from '../core/logoLimits.js';
 import { cloudinaryDestroy, cloudinaryUpload } from './cloudinary.js';
 import { ApiError, firestore, writeAudit, type Caller } from './common.js';
 

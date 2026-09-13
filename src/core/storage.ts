@@ -19,25 +19,17 @@
  * `LOGO_LIMITS` is validated here before the upload even starts (fail fast,
  * no wasted round trip) and re-validated server-side against the same
  * constants, the discipline `LIMITS` in schema.ts already applies to every
- * other bounded input in this codebase.
+ * other bounded input in this codebase. The constants themselves live in
+ * `core/logoLimits.ts`, not here, and that split matters: this file also
+ * imports `callApi` (→ `firebase.ts`, which reads `import.meta.env` at
+ * module scope, a Vite-only construct), so `src/server/logo.ts` must import
+ * the limits from that side-effect-free module directly rather than from
+ * this one — see logoLimits.ts's own comment for what happens if it doesn't.
  */
 import { callApi } from './api.js';
+import { validateLogoFile } from './logoLimits.js';
 
-export const LOGO_LIMITS = {
-  maxBytes: 2 * 1024 * 1024,
-  types: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const,
-};
-
-/** Returns a human-readable reason the file is rejected, or null if it's fine. */
-export function validateLogoFile(file: File): string | null {
-  if (!LOGO_LIMITS.types.includes(file.type as (typeof LOGO_LIMITS.types)[number])) {
-    return 'Logo must be a PNG, JPEG, WebP, or SVG image.';
-  }
-  if (file.size > LOGO_LIMITS.maxBytes) {
-    return `Logo must be ${Math.round(LOGO_LIMITS.maxBytes / 1024 / 1024)}MB or smaller.`;
-  }
-  return null;
-}
+export { LOGO_LIMITS, validateLogoFile } from './logoLimits.js';
 
 /**
  * Reads a File into the bare base64 payload the upload endpoint expects.
