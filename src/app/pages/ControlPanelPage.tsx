@@ -46,13 +46,7 @@ import {
   type BoardState,
   type Side,
 } from '../../core/schema.js';
-import {
-  LOGO_UPLOAD_ENABLED,
-  removeBoardLogo,
-  uploadBoardLogo,
-  validateLogoFile,
-} from '../../core/storage.js';
-import { ensureStorageClient } from '../../core/storageClient.js';
+import { removeBoardLogo, uploadBoardLogo, validateLogoFile } from '../../core/storage.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconChevronDown, IconChevronUp, IconExternalLink } from '../components/icons.js';
@@ -524,7 +518,7 @@ export function ControlPanelPage() {
               onFinish={() => void handleFinish()}
               finishing={finishing}
             />
-            {LOGO_UPLOAD_ENABLED && canManageBoards(session.role) ? (
+            {canManageBoards(session.role) ? (
               <LogoCard
                 board={board}
                 tenantId={session.tenantId}
@@ -949,8 +943,7 @@ function LogoCard({
     setBusy(true);
     setError(null);
     try {
-      const storage = await ensureStorageClient();
-      const logoUrl = await uploadBoardLogo(storage, tenantId, board.id, file);
+      const logoUrl = await uploadBoardLogo(board.id, file);
       await updateBoard(firestore, tenantId, board.id, { theme: { ...board.theme, logoUrl } });
       onAction({ type: 'LOGO_URL_SET', logoUrl });
       setFile(null);
@@ -966,8 +959,7 @@ function LogoCard({
     setBusy(true);
     setError(null);
     try {
-      const storage = await ensureStorageClient();
-      await removeBoardLogo(storage, tenantId, board.id);
+      await removeBoardLogo(board.id);
       await updateBoard(firestore, tenantId, board.id, {
         theme: { ...board.theme, logoUrl: null },
       });

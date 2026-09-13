@@ -171,11 +171,24 @@ CommonJS function bundling cannot `require`.
   `npm --prefix functions`.** That directory was deleted when Cloud Functions
   migrated to Vercel (Cloud Functions require the paid Blaze plan). CI will fail
   on those steps until updated.
-- **Firebase Storage is not provisioned** — it needs Blaze. The per-board
-  tournament-logo upload is therefore hidden behind `LOGO_UPLOAD_ENABLED` in
-  `src/core/storage.ts` (currently `false`), and `tests/e2e/logo.spec.ts` skips
-  itself off the same flag. The feature is complete and tested — flipping the
-  flag after provisioning Storage restores both the UI and its coverage.
+- **The per-board tournament-logo upload goes through Cloudinary, not Firebase
+  Storage.** Storage needs the paid Blaze plan, which blocked the feature
+  outright; Cloudinary needs only a free account. `api/uploadLogo` and
+  `api/removeLogo` (`src/server/logo.ts`, signing in `src/server/cloudinary.ts`)
+  hold the API secret server-side, the same reason every other privileged
+  write in this app goes through `api/*.ts` rather than straight from the
+  browser. **Needs three environment variables that are not yet set anywhere**:
+  `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` — in
+  the Vercel dashboard for production, and in an untracked `.env` file for
+  `vercel dev` locally. Without them, a route call fails with a 500 naming the
+  missing variable rather than doing nothing silently.
+  `tests/e2e/logo.spec.ts` skips itself when `CLOUDINARY_CLOUD_NAME` is absent
+  from the process environment — there is no local emulator for a third-party
+  SaaS the way there is for Firebase, so this is the one flow this codebase
+  cannot verify without a real account. `storage.rules`, `storageClient.ts`,
+  and `tests/rules/storage.test.ts` are unused leftovers from the Firebase
+  Storage version — left in place rather than deleted, since nothing currently
+  depends on removing them.
 - **`onBoardStateWritten`** (the RTDB trigger that logged fine-grained live-game
   changes to the activity feed) was dropped in the migration; Vercel has no
   database-trigger equivalent. Action-level audit entries are unaffected — each

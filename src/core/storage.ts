@@ -1,37 +1,25 @@
 /**
  * The board-branding logo shown on the scoreboard, mirror, and OBS overlay in
- * place of a hardcoded default. One canonical object per board — re-uploading
- * overwrites it — mirroring the path `storage.rules` gates.
+ * place of a hardcoded default. One canonical asset per board — re-uploading
+ * overwrites it — mirroring the path `src/server/logo.ts` uploads it under.
+ *
+ * Uploaded through `api/uploadLogo` to Cloudinary rather than to Firebase
+ * Storage. Storage needs the paid Blaze plan, which is what blocked this
+ * feature outright (this module used to carry a `LOGO_UPLOAD_ENABLED` flag
+ * for exactly that reason — see git history). Cloudinary needs only a free
+ * account, and the credential that actually authorises an upload is an API
+ * secret that must never reach a browser, so the upload itself happens
+ * server-side (`src/server/cloudinary.ts`) the same way every other
+ * privileged write in this app goes through `api/*.ts` rather than straight
+ * from the client — this module only validates the file and hands its bytes
+ * to that endpoint.
  *
  * `LOGO_LIMITS` is validated here before the upload even starts (fail fast,
- * no wasted round trip) and mirrored by hand into `storage.rules`' size/
- * content-type checks, the same discipline `LIMITS` in schema.ts already
- * applies to every other bounded input in this codebase.
+ * no wasted round trip) and re-validated server-side against the same
+ * constants, the discipline `LIMITS` in schema.ts already applies to every
+ * other bounded input in this codebase.
  */
-import {
-  deleteObject,
-  getDownloadURL,
-  ref,
-  uploadBytes,
-  type FirebaseStorage,
-} from 'firebase/storage';
-
-/**
- * Whether the per-board logo upload UI is offered at all.
- *
- * Firebase Storage requires the Blaze (pay-as-you-go) plan — the Spark free
- * tier cannot provision a bucket, so every upload fails at the CORS
- * preflight against a bucket that does not exist. In the browser that
- * surfaces as an opaque CORS error rather than anything a user could act on,
- * so the control is hidden rather than left to fail: an affordance that
- * cannot work is worse than one that is not there.
- *
- * Everything behind this flag is complete and tested (src/server, storage.rules,
- * tests/rules/storage.test.ts, tests/e2e/logo.spec.ts). To restore it: put the
- * project on Blaze, enable Storage in the Firebase console, run
- * `npx firebase deploy --only storage`, and flip this to true.
- */
-export const LOGO_UPLOAD_ENABLED: boolean = false;
+import { callApi } from './api.js';
 
 export const LOGO_LIMITS = {
   maxBytes: 2 * 1024 * 1024,
@@ -49,34 +37,53 @@ export function validateLogoFile(file: File): string | null {
   return null;
 }
 
-function logoRef(storage: FirebaseStorage, tenantId: string, boardId: string) {
-  return ref(storage, `tenants/${tenantId}/boards/${boardId}/logo`);
+/**
+ * Reads a File into the bare base64 payload the upload endpoint expects.
+ *
+ * `readAsDataURL` yields `data:<type>;base64,<payload>`; the endpoint wants
+ * only what follows the comma; it already knows the content type from the
+ * file itself and re-attaches it before forwarding to Cloudinary.
+ */
+function readAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read that file.'));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Could not read that file.'));
+        return;
+      }
+      const comma = result.indexOf(',');
+      resolve(comma === -1 ? result : result.slice(comma + 1));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
-export async function uploadBoardLogo(
-  storage: FirebaseStorage,
-  tenantId: string,
-  boardId: string,
-  file: File,
-): Promise<string> {
+interface UploadLogoResult {
+  logoUrl: string;
+}
+
+/**
+ * Uploads a board's tournament logo, returning the URL to persist onto the
+ * board's `theme.logoUrl` (the caller's job — this function only produces the
+ * URL, the same division of labour the old Firebase Storage version had).
+ */
+export async function uploadBoardLogo(boardId: string, file: File): Promise<string> {
   const invalid = validateLogoFile(file);
   if (invalid) throw new Error(invalid);
 
-  const target = logoRef(storage, tenantId, boardId);
-  await uploadBytes(target, file, { contentType: file.type });
-  return getDownloadURL(target);
+  const dataBase64 = await readAsBase64(file);
+  const { logoUrl } = await callApi<UploadLogoResult>('uploadLogo', {
+    boardId,
+    contentType: file.type,
+    dataBase64,
+  });
+  return logoUrl;
 }
 
-/** Best-effort: a logo that was already removed (or never existed) is not an error. */
-export async function removeBoardLogo(
-  storage: FirebaseStorage,
-  tenantId: string,
-  boardId: string,
-): Promise<void> {
-  try {
-    await deleteObject(logoRef(storage, tenantId, boardId));
-  } catch (caught) {
-    const code = (caught as { code?: string } | null)?.code;
-    if (code !== 'storage/object-not-found') throw caught;
-  }
+/** Best-effort on the server side too: a logo already removed is not an error. */
+export async function removeBoardLogo(boardId: string): Promise<void> {
+  await callApi('removeLogo', { boardId });
 }

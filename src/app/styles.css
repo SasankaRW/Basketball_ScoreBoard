@@ -2011,13 +2011,19 @@ textarea:focus {
    reports, and why nothing here sets a position itself.
 */
 
+/*
+   Two grid columns, not two independently-stacked halves: `.layout-editor__main`
+   (the stage, its hint, and — once there is a draft — the section list, the
+   removed tray, and publish/reset) carries its own height end to end, and the
+   `<aside>` next to it is `position: sticky` rather than a same-height row
+   partner. An earlier version paired the stage with the aside in one grid row
+   and stacked the wider blocks in a second row below *that* row — which still
+   left a gap under the stage exactly as tall as however far the aside (whose
+   height depends on which section is selected, and so is never fixed) ran
+   past it. Giving the aside no row of its own to force even with removes the
+   gap outright rather than shrinking it.
+*/
 .layout-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.layout-editor__top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: var(--space-5);
@@ -2025,9 +2031,16 @@ textarea:focus {
 }
 
 @media (max-width: 1100px) {
-  .layout-editor__top {
+  .layout-editor {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.layout-editor__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
 }
 
 .layout-editor__bottom {

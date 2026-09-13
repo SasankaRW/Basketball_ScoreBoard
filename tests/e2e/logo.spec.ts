@@ -1,25 +1,30 @@
 /**
  * Uploading a per-board tournament logo from the Control Panel, and seeing it
- * appear on the scoreboard — proving the whole path: Storage upload, the
- * Firestore `theme.logoUrl` persist, and the live `LOGO_URL_SET` dispatch
- * that makes it show up on the game in progress without a restart.
+ * appear on the scoreboard — proving the whole path: the Cloudinary upload
+ * (`api/uploadLogo`, `src/server/cloudinary.ts`), the Firestore
+ * `theme.logoUrl` persist, and the live `LOGO_URL_SET` dispatch that makes it
+ * show up on the game in progress without a restart.
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
 import { createBoard, freshAccount, signUp } from './fixtures.js';
-import { LOGO_UPLOAD_ENABLED } from '../../src/core/storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOGO_FIXTURE = path.join(__dirname, '..', 'fixtures', 'logo.png');
 
 test.describe.configure({ mode: 'serial' });
 
-// Skipped, not deleted, while Firebase Storage is unavailable on the free
-// plan (see LOGO_UPLOAD_ENABLED in src/core/storage.ts). These come back
-// automatically the moment the flag flips, so the feature never ships
-// unverified — which is the whole reason to skip rather than remove them.
-test.skip(!LOGO_UPLOAD_ENABLED, 'logo upload is disabled until Firebase Storage is provisioned');
+// Skipped, not deleted, when this environment has no real Cloudinary account
+// to upload to — there is no local emulator for a third-party SaaS the way
+// there is for Firebase, so these need CLOUDINARY_CLOUD_NAME/API_KEY/
+// API_SECRET actually set (see src/server/cloudinary.ts) to do anything.
+// `vercel dev` (via scripts/with-vercel-dev.mjs) inherits this same process
+// environment, so the two agree about whether the feature can work here.
+test.skip(
+  !process.env['CLOUDINARY_CLOUD_NAME'],
+  'logo upload needs CLOUDINARY_* environment variables pointing at a real account',
+);
 
 test('an owner can upload a tournament logo and see it on the scoreboard', async ({ page }) => {
   await signUp(page, freshAccount('logo'));
