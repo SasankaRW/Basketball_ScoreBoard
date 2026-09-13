@@ -51,7 +51,15 @@ import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconChevronDown, IconChevronUp, IconExternalLink } from '../components/icons.js';
 import { ShortcutEditor } from '../components/ShortcutEditor.js';
-import { Alert, CopyField, Field, Modal, Spinner } from '../components/ui.js';
+import {
+  Alert,
+  CopyField,
+  Field,
+  Modal,
+  Spinner,
+  useConfirm,
+  type ConfirmOptions,
+} from '../components/ui.js';
 import { useTour } from '../tour/TourProvider.js';
 import { useBoard, useBoardState, useDispatch, useNow } from '../hooks.js';
 
@@ -71,6 +79,7 @@ export function ControlPanelPage() {
   const readOnly = !canControlBoard(session.role);
   const clocksActive = (state?.gameClock.running ?? false) || (state?.shotClock.running ?? false);
   const now = useNow(clocksActive, 100);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [editingTime, setEditingTime] = useState(false);
   const [editingNames, setEditingNames] = useState(false);
@@ -185,9 +194,10 @@ export function ControlPanelPage() {
   const handleFinish = useCallback(async () => {
     if (!state || !boardId) return;
     if (
-      !confirm(
+      !(await confirm(
         'Finish this match? The final score will be saved to match history and the board will reset for the next game.',
-      )
+        { confirmLabel: 'Finish match' },
+      ))
     ) {
       return;
     }
@@ -207,7 +217,7 @@ export function ControlPanelPage() {
     } finally {
       setFinishing(false);
     }
-  }, [state, boardId]);
+  }, [state, boardId, confirm]);
 
   /**
    * Buzzers here as well as on the scoreboard.
@@ -311,8 +321,12 @@ export function ControlPanelPage() {
 
       'period.plus': () => dispatch({ type: 'PERIOD_ADJUST', delta: 1 }),
       'period.minus': () => dispatch({ type: 'PERIOD_ADJUST', delta: -1 }),
-      'period.next': () => {
-        if (confirm('Start the next period? Team fouls reset and both clocks return to full.')) {
+      'period.next': async () => {
+        if (
+          await confirm('Start the next period? Team fouls reset and both clocks return to full.', {
+            confirmLabel: 'Start next period',
+          })
+        ) {
           dispatch({ type: 'NEXT_PERIOD' });
         }
       },
@@ -323,18 +337,19 @@ export function ControlPanelPage() {
 
       'teamNames.edit': () => setEditingNames(true),
       'match.finish': () => void handleFinish(),
-      'game.new': () => {
+      'game.new': async () => {
         if (
           board &&
-          confirm(
+          (await confirm(
             'Start a new game without saving history? Score, fouls and clocks will all be cleared and this game will NOT appear in match history. Use "Finish match" instead if you want to keep a record of it.',
-          )
+            { confirmLabel: 'Start new game', danger: true },
+          ))
         ) {
           dispatch({ type: 'NEW_GAME', config: board.config });
         }
       },
     };
-  }, [dispatch, state, board, handleFinish]);
+  }, [dispatch, state, board, handleFinish, confirm]);
 
   // Any dialog stacked over the board. Shortcuts — mouse ones especially, since
   // there is no "focused text field" to shield a click the way there is for a
@@ -517,6 +532,7 @@ export function ControlPanelPage() {
               onAction={dispatch}
               onFinish={() => void handleFinish()}
               finishing={finishing}
+              confirm={confirm}
             />
             {canManageBoards(session.role) ? (
               <LogoCard
@@ -524,6 +540,7 @@ export function ControlPanelPage() {
                 tenantId={session.tenantId}
                 state={state}
                 onAction={dispatch}
+                confirm={confirm}
               />
             ) : null}
             {canManageBoards(session.role) ? (
@@ -611,6 +628,8 @@ export function ControlPanelPage() {
           </p>
         </Modal>
       ) : null}
+
+      {confirmDialog}
     </AppShell>
   );
 }
@@ -618,6 +637,9 @@ export function ControlPanelPage() {
 // ---------------------------------------------------------------------------
 
 type Dispatch = ReturnType<typeof useDispatch>['dispatch'];
+
+/** The shape `useConfirm()`'s `confirm` returns, for sub-components it's passed down to. */
+type ConfirmFn = (message: string, options?: ConfirmOptions) => Promise<boolean>;
 
 function TeamPanel({
   side,
@@ -841,6 +863,7 @@ function GameActions({
   onAction,
   onFinish,
   finishing,
+  confirm,
 }: {
   state: BoardState;
   /**
@@ -857,6 +880,7 @@ function GameActions({
   onAction: Dispatch;
   onFinish: () => void;
   finishing: boolean;
+  confirm: ConfirmFn;
 }) {
   return (
     <div className="card stack">
@@ -874,9 +898,16 @@ function GameActions({
         className="btn btn--block"
         disabled={disabled || state.period >= LIMITS.period.max}
         onClick={() => {
-          if (confirm('Start the next period? Team fouls reset and both clocks return to full.')) {
-            onAction({ type: 'NEXT_PERIOD' });
-          }
+          void (async () => {
+            if (
+              await confirm(
+                'Start the next period? Team fouls reset and both clocks return to full.',
+                { confirmLabel: 'Start next period' },
+              )
+            ) {
+              onAction({ type: 'NEXT_PERIOD' });
+            }
+          })();
         }}
       >
         Start next period
@@ -894,13 +925,16 @@ function GameActions({
         className="btn btn--danger btn--block"
         disabled={disabled}
         onClick={() => {
-          if (
-            confirm(
-              'Start a new game without saving history? Score, fouls and clocks will all be cleared and this game will NOT appear in match history. Use "Finish match" instead if you want to keep a record of it.',
-            )
-          ) {
-            onAction({ type: 'NEW_GAME', config: boardConfig });
-          }
+          void (async () => {
+            if (
+              await confirm(
+                'Start a new game without saving history? Score, fouls and clocks will all be cleared and this game will NOT appear in match history. Use "Finish match" instead if you want to keep a record of it.',
+                { confirmLabel: 'Start new game', danger: true },
+              )
+            ) {
+              onAction({ type: 'NEW_GAME', config: boardConfig });
+            }
+          })();
         }}
       >
         New game (discard, no history)
@@ -921,11 +955,13 @@ function LogoCard({
   tenantId,
   state,
   onAction,
+  confirm,
 }: {
   board: Board;
   tenantId: string;
   state: BoardState;
   onAction: Dispatch;
+  confirm: ConfirmFn;
 }) {
   const firestore = getFirestoreClient();
   const [file, setFile] = useState<File | null>(null);
@@ -955,7 +991,13 @@ function LogoCard({
   }
 
   async function remove() {
-    if (!confirm('Remove the tournament logo from this board?')) return;
+    if (
+      !(await confirm('Remove the tournament logo from this board?', {
+        confirmLabel: 'Remove logo',
+        danger: true,
+      }))
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
@@ -972,7 +1014,7 @@ function LogoCard({
   }
 
   return (
-    <div className="card stack">
+    <div className="card stack" data-tour="logo">
       <h3>Tournament logo</h3>
       {error ? <Alert kind="error">{error}</Alert> : null}
       {state.logoUrl ? (

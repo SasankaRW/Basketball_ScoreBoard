@@ -159,3 +159,32 @@ test('stepping through the control-panel tour does not score points', async ({ p
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('.team-panel__score').first()).toHaveText('01');
 });
+
+test('the layout editor has its own tour, distinct from board settings', async ({ page }) => {
+  await signUpWithTour(page, freshAccount('tour-layout'));
+  await expect(card(page)).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Skip tour' }).click();
+
+  await createBoard(page, 'Court 1');
+
+  // Settings still gets its own tour — the new one added there mentions the
+  // Layout button rather than replacing anything.
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Help' }).click();
+  await expect(card(page)).toContainText('Board settings');
+
+  // Following the Layout link lands on a genuinely different tour, not the
+  // settings one again — `tourForPath`'s more specific match has to win.
+  // "Skip tour" at the very top of this test dismissed auto-start globally,
+  // so — same as the settings tour just above — Help is what opens this one.
+  await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: 'Layout', exact: true }).click();
+  await page.getByRole('button', { name: 'Help' }).click();
+  await expect(card(page)).toBeVisible({ timeout: 10_000 });
+  await expect(card(page)).toContainText('Arranging the scoreboard');
+
+  // Steps anchored inside the "Customise layout" gate resolve without the
+  // tour breaking, since a fresh board has not been customised yet.
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('.tour__count')).toContainText('2 of');
+});

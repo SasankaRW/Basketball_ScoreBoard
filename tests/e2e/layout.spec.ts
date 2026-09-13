@@ -113,8 +113,8 @@ test('reset returns the board to the scoreboard it shipped with', async ({ page,
   await operatorPage.goto(`/board/${boardId}`);
   await expect(operatorPage.locator('.scoreboard')).toHaveClass(/sb-custom/, { timeout: 20_000 });
 
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Reset to default layout' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Reset layout' }).click();
   await expect(page.getByText(/Back to the default layout/)).toBeVisible({ timeout: 15_000 });
 
   // Live, on the page already open: the class comes off and the inline geometry

@@ -166,8 +166,8 @@ test('a rotated viewer key immediately invalidates the old mirror link', async (
 
   const oldMirrorUrl = await copyFieldValue(page, 'settings-mirror');
 
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Rotate mirror link' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Rotate link' }).click();
   await expect(page.getByText(/mirror link has been rotated/i)).toBeVisible();
 
   const newMirrorUrl = await waitForCopyFieldChange(page, 'settings-mirror', oldMirrorUrl);

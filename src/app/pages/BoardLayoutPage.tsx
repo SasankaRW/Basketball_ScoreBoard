@@ -42,7 +42,7 @@ import { canManageBoards } from '../../core/roles.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { LayoutCanvas, type CanvasAspect, type SnapSettings } from '../components/LayoutCanvas.js';
-import { Alert, Field, Spinner } from '../components/ui.js';
+import { Alert, Field, Spinner, useConfirm } from '../components/ui.js';
 import { useBoard } from '../hooks.js';
 import type { LayoutMetrics } from '../../display/shared/layoutBridge.js';
 
@@ -87,6 +87,7 @@ export function BoardLayoutPage() {
   const measured = useRef<LayoutMetrics | null>(null);
 
   const canEdit = canManageBoards(session.role);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (!boardId) return;
@@ -254,9 +255,10 @@ export function BoardLayoutPage() {
   async function resetToDefault() {
     if (!boardId) return;
     if (
-      !confirm(
+      !(await confirm(
         'Reset this board to the default scoreboard layout? The custom arrangement is deleted and every screen goes back to the original.',
-      )
+        { confirmLabel: 'Reset layout', danger: true },
+      ))
     ) {
       return;
     }
@@ -378,7 +380,7 @@ export function BoardLayoutPage() {
           </p>
 
           {draft ? (
-            <div className="layout-editor__bottom">
+            <div className="layout-editor__bottom" data-tour="layout-sections">
               <section className="layout-panel__block">
                 <h2>Sections</h2>
                 <div className="layout-panel__columns">
@@ -440,54 +442,51 @@ export function BoardLayoutPage() {
                   </ul>
                 )}
               </section>
-
-              <section className="layout-panel__block">
-                <h2>Publish</h2>
-                <div className="layout-panel__actions">
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    disabled={!dirty || saving}
-                    onClick={() => void save()}
-                  >
-                    {saving ? 'Publishing…' : 'Publish layout'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={!dirty || saving}
-                    onClick={discard}
-                  >
-                    Discard changes
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={history.length === 0}
-                    onClick={undo}
-                  >
-                    Undo
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn--danger"
-                  disabled={saving}
-                  onClick={() => void resetToDefault()}
-                >
-                  Reset to default layout
-                </button>
-                <p className="muted">
-                  Reset deletes the custom arrangement. Every screen on this board goes back to the
-                  scoreboard it shipped with.
-                </p>
-              </section>
             </div>
           ) : null}
         </div>
 
         <aside className="layout-panel">
-          <section className="layout-panel__block">
+          {draft ? (
+            <section className="layout-panel__block" data-tour="layout-publish">
+              <h2>Publish</h2>
+              <div className="layout-panel__actions">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={!dirty || saving}
+                  onClick={() => void save()}
+                >
+                  {saving ? 'Publishing…' : 'Publish layout'}
+                </button>
+                <button type="button" className="btn" disabled={!dirty || saving} onClick={discard}>
+                  Discard changes
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={history.length === 0}
+                  onClick={undo}
+                >
+                  Undo
+                </button>
+              </div>
+              <button
+                type="button"
+                className="btn btn--danger"
+                disabled={saving}
+                onClick={() => void resetToDefault()}
+              >
+                Reset to default layout
+              </button>
+              <p className="muted">
+                Reset deletes the custom arrangement. Every screen on this board goes back to the
+                scoreboard it shipped with.
+              </p>
+            </section>
+          ) : null}
+
+          <section className="layout-panel__block" data-tour="layout-canvas">
             <h2>Canvas</h2>
             {/* A group of buttons, not a form control, so it carries its own
                   grouping label rather than going through `Field` — which wires a
@@ -642,6 +641,8 @@ export function BoardLayoutPage() {
           ) : null}
         </aside>
       </div>
+
+      {confirmDialog}
     </AppShell>
   );
 }

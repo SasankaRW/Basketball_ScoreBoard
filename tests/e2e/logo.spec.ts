@@ -53,8 +53,8 @@ test('removing a logo hides it again on the scoreboard', async ({ page }) => {
   await page.getByRole('button', { name: 'Upload' }).click();
   await expect(page.locator('.logo-card__preview')).toBeVisible({ timeout: 10_000 });
 
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Remove' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove logo' }).click();
   await expect(page.getByText('No logo set.')).toBeVisible({ timeout: 10_000 });
 
   const boardId = page.url().split('/').pop();

@@ -60,8 +60,8 @@ test('timeouts are allocated per half and refill at the break', async ({ page })
   // promise, and the path this exercises.
   await page.getByRole('link', { name: 'Control panel' }).click();
   const homeTimeouts = page.locator('.team-panel').first().locator('.stat-row__value').last();
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'New game (discard, no history)' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start new game' }).click();
   await expect(homeTimeouts).toHaveText('3', { timeout: 10_000 });
 
   // Spend two of the three.
@@ -70,14 +70,14 @@ test('timeouts are allocated per half and refill at the break', async ({ page })
   await expect(homeTimeouts).toHaveText('1');
 
   // Q1 → Q2 is still the first half: what is left must carry over.
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Start next period' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start next period' }).click();
   await expect(page.locator('.clock-console__period')).toHaveText('Q2');
   await expect(homeTimeouts).toHaveText('1');
 
   // Q2 → Q3 opens the second half, so the allowance comes back.
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Start next period' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start next period' }).click();
   await expect(page.locator('.clock-console__period')).toHaveText('Q3');
   await expect(homeTimeouts).toHaveText('3');
 
@@ -86,8 +86,8 @@ test('timeouts are allocated per half and refill at the break', async ({ page })
   await page.getByRole('button', { name: 'Use home timeout' }).click();
   await expect(homeTimeouts).toHaveText('2');
 
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Finish match' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Finish match' }).click();
   await expect(page.getByRole('heading', { name: 'Match finished' })).toBeVisible({
     timeout: 10_000,
   });

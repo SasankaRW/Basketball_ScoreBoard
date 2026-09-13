@@ -130,6 +130,12 @@ export const CONTROL_TOUR: TourDefinition = {
       placement: 'left',
     },
     {
+      anchor: '[data-tour="logo"]',
+      title: 'Tournament logo',
+      body: 'Upload a PNG, JPEG, WebP, or SVG and it shows up on the scoreboard, mirror and overlay immediately — no restart needed. It also saves to this board, so the next game started here opens with it already in place.',
+      placement: 'left',
+    },
+    {
       anchor: '[data-tour="clock-screens"]',
       title: 'Clock-only screens',
       body: 'Two more read-only links, alongside the mirror and overlay: one shows nothing but the game clock, the other nothing but the shot clock — handy for a shot-clock pole or a second monitor with room for only one number.',
@@ -202,6 +208,12 @@ export const SETTINGS_TOUR: TourDefinition = {
       body: 'The rules this one board plays by, the links that put it on a screen, and the two ways to retire it when you are done.',
     },
     {
+      anchor: '.page-head__actions',
+      title: 'Rearranging the scoreboard',
+      body: '"Layout" opens a separate editor for where each section of this board sits — drag to move, resize, remove a section entirely, or link the home and away sides so they stay in step. The scoreboard itself never changes until you publish from there.',
+      placement: 'bottom',
+    },
+    {
       anchor: '[data-tour="rules"]',
       title: 'Match rules',
       body: 'Period length, shot clock length, the shorter reset used for an offensive rebound, timeouts per half and the foul count that puts a team in the bonus. "Save settings" pushes these straight to the live board, but most only take hold from the next clock reset or new game — a shot clock already counting down keeps doing so on the old length. The one true exception is the clock display option, which changes how the time on screen is drawn and so takes effect the instant you save.',
@@ -223,12 +235,55 @@ export const SETTINGS_TOUR: TourDefinition = {
   ],
 };
 
+export const LAYOUT_TOUR: TourDefinition = {
+  id: 'layout',
+  title: 'Layout',
+  steps: [
+    {
+      title: 'Arranging the scoreboard',
+      body: 'This board is showing the stock scoreboard right now, and stays that way until you press "Customise layout" — nothing here changes what anyone sees until you publish it.',
+    },
+    {
+      anchor: '.layout-editor__intro',
+      title: 'Start from what is already there',
+      body: 'Customising captures the board exactly as it stands — every score, name, clock and label at its real position — rather than opening on a blank guess. Reset later always puts the original stock scoreboard back exactly, pixel for pixel, whatever you do to this arrangement in between.',
+      placement: 'bottom',
+    },
+    {
+      anchor: '.layout-editor__stage',
+      title: 'The live preview',
+      body: "This is the board's real mirror, not a mockup — drag a section to move it, or grab an edge or corner to resize. Guides snap it against other sections and the board's own centre; hold Alt to ignore them for a moment, or arrow keys to nudge a pixel at a time.",
+      placement: 'right',
+    },
+    {
+      anchor: '[data-tour="layout-canvas"]',
+      title: 'Keep both sides matching',
+      body: '"Link home ↔ away" is on by default: moving or resizing a team name, score, fouls, or timeouts box applies the same change to its mirror on the other side, so the board stays symmetric without lining anything up twice. Turn it off when the two sides genuinely need to differ.',
+      placement: 'left',
+    },
+    {
+      anchor: '[data-tour="layout-sections"]',
+      title: 'Add or remove sections',
+      body: 'Remove takes a section off the board entirely — the tournament logo or the help hint line, say, if a venue screen has no room for them. A removed section moves to the tray on the right and one click brings it back, wherever you last left it.',
+      placement: 'top',
+    },
+    {
+      anchor: '[data-tour="layout-publish"]',
+      title: 'Publishing',
+      body: '"Publish layout" is the only thing that reaches the gym-wall scoreboard, the mirror, and the overlay — everything above it is a draft only this screen can see. "Reset to default layout" deletes the custom arrangement outright and returns every screen to the scoreboard it shipped with.',
+      placement: 'left',
+    },
+    helpStep,
+  ],
+};
+
 const TOURS: TourDefinition[] = [
   DASHBOARD_TOUR,
   CONTROL_TOUR,
   SCHEDULE_TOUR,
   HISTORY_TOUR,
   SETTINGS_TOUR,
+  LAYOUT_TOUR,
 ];
 
 /**
@@ -243,6 +298,10 @@ export function tourForPath(pathname: string): TourDefinition | null {
   if (pathname === '/app') return DASHBOARD_TOUR;
   if (pathname.startsWith('/app/schedule')) return SCHEDULE_TOUR;
   if (pathname.startsWith('/app/history')) return HISTORY_TOUR;
+  // Checked ahead of the plain /app/boards/ prefix below, which this path also
+  // matches — the more specific route has to win, or the layout editor would
+  // never see anything but the settings tour.
+  if (pathname.startsWith('/app/boards/') && pathname.endsWith('/layout')) return LAYOUT_TOUR;
   if (pathname.startsWith('/app/boards/')) return SETTINGS_TOUR;
   if (pathname.startsWith('/control/')) return CONTROL_TOUR;
   return null;

@@ -47,8 +47,8 @@ test('scheduling, starting, playing, and finishing a match produces the right hi
   await expect(page.locator('.team-panel__score').first()).toHaveText('03');
 
   // Finish it.
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Finish match' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Finish match' }).click();
   await expect(page.getByRole('heading', { name: 'Match finished' })).toBeVisible({
     timeout: 10_000,
   });
@@ -104,14 +104,14 @@ test('a played game produces a play-by-play in history', async ({ page }) => {
   await page.getByRole('button', { name: 'Use away timeout' }).click();
 
   // Into the second, then one more basket, so the timeline has to group.
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Start next period' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start next period' }).click();
   await expect(page.locator('.clock-console__period')).toHaveText('Q2');
   await scoreButtons.nth(0).click(); // home +1
   await expect(page.locator('.team-panel__score').first()).toHaveText('03');
 
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Finish match' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Finish match' }).click();
   await expect(page.getByRole('heading', { name: 'Match finished' })).toBeVisible({
     timeout: 10_000,
   });
@@ -212,12 +212,17 @@ test('two near-simultaneous Finish clicks on the same board produce exactly one 
     timeout: 10_000,
   });
 
-  page.once('dialog', (dialog) => void dialog.accept());
-  secondPage.once('dialog', (dialog) => void dialog.accept());
-
+  // Each trigger click only opens that page's own confirm dialog; the actual
+  // near-simultaneous `finishMatch` calls this test is about happen on the
+  // *second* click below, confirming both at once.
   await Promise.all([
     page.getByRole('button', { name: 'Finish match' }).click(),
     secondPage.getByRole('button', { name: 'Finish match' }).click(),
+  ]);
+
+  await Promise.all([
+    page.getByRole('dialog').getByRole('button', { name: 'Finish match' }).click(),
+    secondPage.getByRole('dialog').getByRole('button', { name: 'Finish match' }).click(),
   ]);
 
   // At least one of the two tabs must have actually succeeded — give it time

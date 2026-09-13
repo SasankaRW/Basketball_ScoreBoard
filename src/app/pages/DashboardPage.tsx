@@ -30,7 +30,15 @@ import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { BoardCard } from '../components/BoardCard.js';
 import { IconPlus } from '../components/icons.js';
-import { Alert, CopyField, Field, Modal, RoleBadge, Spinner } from '../components/ui.js';
+import {
+  Alert,
+  CopyField,
+  Field,
+  Modal,
+  RoleBadge,
+  Spinner,
+  useConfirm,
+} from '../components/ui.js';
 import { useBoards } from '../hooks.js';
 
 function formatTime(ms: number): string {
@@ -261,6 +269,7 @@ function MembersSection({ tenantId }: { tenantId: string }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [showInvite, setShowInvite] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => subscribeMembers(firestore, tenantId, setMembers), [firestore, tenantId]);
 
@@ -274,7 +283,13 @@ function MembersSection({ tenantId }: { tenantId: string }) {
   }
 
   async function remove(uid: string, email: string) {
-    if (!confirm(`Remove ${email} from this organisation?`)) return;
+    if (
+      !(await confirm(`Remove ${email} from this organisation?`, {
+        confirmLabel: 'Remove member',
+        danger: true,
+      }))
+    )
+      return;
     setError(null);
     try {
       await removeMember(uid);
@@ -354,6 +369,8 @@ function MembersSection({ tenantId }: { tenantId: string }) {
       </div>
 
       {showInvite ? <InviteModal onClose={() => setShowInvite(false)} /> : null}
+
+      {confirmDialog}
     </section>
   );
 }

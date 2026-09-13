@@ -19,7 +19,7 @@ import { BoardConfigSchema, type BoardConfig } from '../../core/schema.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconTrash } from '../components/icons.js';
-import { Alert, ConfirmDelete, CopyField, Field, Spinner } from '../components/ui.js';
+import { Alert, ConfirmDelete, CopyField, Field, Spinner, useConfirm } from '../components/ui.js';
 import { useBoard, useDispatch } from '../hooks.js';
 
 export function BoardSettingsPage() {
@@ -37,6 +37,7 @@ export function BoardSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     if (!boardId) return;
@@ -106,9 +107,10 @@ export function BoardSettingsPage() {
   async function rotate(kind: ViewerKeyKind) {
     if (!boardId) return;
     if (
-      !confirm(
+      !(await confirm(
         `Rotate the ${kind} link? The current URL stops working immediately and anything using it must be updated.`,
-      )
+        { confirmLabel: 'Rotate link', danger: true },
+      ))
     ) {
       return;
     }
@@ -396,6 +398,8 @@ export function BoardSettingsPage() {
           onConfirm={() => void destroy()}
         />
       ) : null}
+
+      {confirmDialog}
     </AppShell>
   );
 }

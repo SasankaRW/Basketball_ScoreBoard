@@ -36,8 +36,8 @@ test('lists a board only while its game is in progress', async ({ page }) => {
   // Discarding the game resets the board to idle, and the row should follow.
   await row.getByRole('link', { name: 'Open' }).click();
   await expect(page.getByRole('heading', { name: 'Live Court' })).toBeVisible();
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'New game (discard, no history)' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start new game' }).click();
   await expect(page.locator('.team-panel__score').first()).toHaveText('00');
 
   await page.getByRole('link', { name: 'Live' }).click();

@@ -25,7 +25,7 @@ import { subscribeTenant, type Tenant } from '../../core/tenant.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconPlus } from '../components/icons.js';
-import { Alert, Field, Modal, Spinner } from '../components/ui.js';
+import { Alert, Field, Modal, Spinner, useConfirm } from '../components/ui.js';
 import { useBoardState, useBoards } from '../hooks.js';
 
 function toDateTimeLocal(ms: number): string {
@@ -68,6 +68,7 @@ export function SchedulePage() {
   const [editing, setEditing] = useState<ScheduleEntry | null>(null);
   const [starting, setStarting] = useState<ScheduleEntry | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(
     () => subscribeTenant(firestore, session.tenantId, setTenant),
@@ -87,7 +88,12 @@ export function SchedulePage() {
   );
 
   async function cancel(entry: ScheduleEntry) {
-    if (!confirm(`Cancel the scheduled match "${entry.homeTeamName} vs ${entry.awayTeamName}"?`))
+    if (
+      !(await confirm(
+        `Cancel the scheduled match "${entry.homeTeamName} vs ${entry.awayTeamName}"?`,
+        { confirmLabel: 'Cancel match', danger: true },
+      ))
+    )
       return;
     setError(null);
     try {
@@ -99,9 +105,10 @@ export function SchedulePage() {
 
   async function remove(entry: ScheduleEntry) {
     if (
-      !confirm(
+      !(await confirm(
         `Permanently delete "${entry.homeTeamName} vs ${entry.awayTeamName}" from the schedule?`,
-      )
+        { confirmLabel: 'Delete permanently', danger: true },
+      ))
     ) {
       return;
     }
@@ -273,6 +280,8 @@ export function SchedulePage() {
           onStarted={(boardId) => navigate(`/control/${boardId}`)}
         />
       ) : null}
+
+      {confirmDialog}
     </AppShell>
   );
 }

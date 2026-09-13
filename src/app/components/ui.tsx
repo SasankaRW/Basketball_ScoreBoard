@@ -149,6 +149,82 @@ export function Modal({
   );
 }
 
+export interface ConfirmOptions {
+  /** Defaults to "Are you sure?" — most callers just want the message read. */
+  title?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  /** Renders the confirm button as `btn--danger` instead of `btn--primary`. */
+  danger?: boolean;
+}
+
+interface PendingConfirm extends ConfirmOptions {
+  message: string;
+  resolve: (confirmed: boolean) => void;
+}
+
+/**
+ * An in-app, promise-based replacement for the browser's native `confirm()`.
+ *
+ * The native dialog is synchronous and blocks the whole tab, and it renders
+ * in the browser's own chrome — a jarring system-grey box on top of an
+ * otherwise consistently dark, themed app. `await confirm('Remove this?')`
+ * reads exactly like the native call it replaces, but resolves through a
+ * `<Modal>` styled like the rest of the console instead.
+ *
+ * One call site, one instance: mount `dialog` once near the top of whichever
+ * page or component owns the actions that need confirming, and pass `confirm`
+ * down to any sub-component that needs to ask. Only one confirmation can be
+ * pending at a time per instance, which matches how the native dialog
+ * behaved too — nothing in this app ever needed to stack two of them.
+ */
+export function useConfirm(): {
+  confirm: (message: string, options?: ConfirmOptions) => Promise<boolean>;
+  dialog: ReactNode;
+} {
+  const [pending, setPending] = useState<PendingConfirm | null>(null);
+
+  const confirm = useCallback((message: string, options: ConfirmOptions = {}) => {
+    return new Promise<boolean>((resolve) => {
+      setPending({ message, resolve, ...options });
+    });
+  }, []);
+
+  const settle = useCallback(
+    (confirmed: boolean) => {
+      pending?.resolve(confirmed);
+      setPending(null);
+    },
+    [pending],
+  );
+
+  const dialog = pending ? (
+    <Modal
+      title={pending.title ?? 'Are you sure?'}
+      onClose={() => settle(false)}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={() => settle(false)}>
+            {pending.cancelLabel ?? 'Cancel'}
+          </button>
+          <button
+            type="button"
+            className={`btn ${pending.danger ? 'btn--danger' : 'btn--primary'}`}
+            onClick={() => settle(true)}
+            autoFocus
+          >
+            {pending.confirmLabel ?? 'Confirm'}
+          </button>
+        </>
+      }
+    >
+      <p>{pending.message}</p>
+    </Modal>
+  ) : null;
+
+  return { confirm, dialog };
+}
+
 /**
  * A label paired with one form control.
  *
