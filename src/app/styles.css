@@ -338,6 +338,11 @@ h3 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   gap: var(--space-4);
+  /* Grid's default `align-items: stretch` sizes every card in a row to the
+     row's *tallest* member. Expanding one card's "Share links" is what
+     exposes it: its row-mates would stretch to match, even though nothing in
+     them actually got taller — each card sizes to its own content instead. */
+  align-items: start;
 }
 
 .board-card {

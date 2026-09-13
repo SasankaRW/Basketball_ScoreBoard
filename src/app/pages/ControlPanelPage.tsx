@@ -18,8 +18,6 @@ import {
   buildScoreboardUrl,
   buildShotClockUrl,
   subscribeViewerKeys,
-  updateBoard,
-  type Board,
   type ViewerKeys,
 } from '../../core/boards.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
@@ -46,11 +44,11 @@ import {
   type BoardState,
   type Side,
 } from '../../core/schema.js';
-import { removeBoardLogo, uploadBoardLogo, validateLogoFile } from '../../core/storage.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconChevronDown, IconChevronUp, IconExternalLink } from '../components/icons.js';
 import { ShortcutEditor } from '../components/ShortcutEditor.js';
+import { TournamentLogoCard } from '../components/TournamentLogoCard.js';
 import {
   Alert,
   CopyField,
@@ -535,11 +533,12 @@ export function ControlPanelPage() {
               confirm={confirm}
             />
             {canManageBoards(session.role) ? (
-              <LogoCard
+              <TournamentLogoCard
                 board={board}
                 tenantId={session.tenantId}
-                state={state}
-                onAction={dispatch}
+                firestore={getFirestoreClient()}
+                previewUrl={state.logoUrl}
+                dispatch={dispatch}
                 confirm={confirm}
               />
             ) : null}
@@ -943,115 +942,9 @@ function GameActions({
   );
 }
 
-/**
- * Uploads the board's tournament logo — shown on the scoreboard, mirror, and
- * overlay in place of a default. Persists to the board's Firestore doc
- * (`theme.logoUrl`, picked up by the next game this board starts) and
- * dispatches `LOGO_URL_SET` so the change is visible on the game in progress
- * right now, without waiting for a restart.
- */
-function LogoCard({
-  board,
-  tenantId,
-  state,
-  onAction,
-  confirm,
-}: {
-  board: Board;
-  tenantId: string;
-  state: BoardState;
-  onAction: Dispatch;
-  confirm: ConfirmFn;
-}) {
-  const firestore = getFirestoreClient();
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function pickFile(picked: File | null) {
-    const reason = picked ? validateLogoFile(picked) : null;
-    setError(reason);
-    setFile(reason ? null : picked);
-  }
-
-  async function upload() {
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const logoUrl = await uploadBoardLogo(board.id, file);
-      await updateBoard(firestore, tenantId, board.id, { theme: { ...board.theme, logoUrl } });
-      onAction({ type: 'LOGO_URL_SET', logoUrl });
-      setFile(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not upload that logo.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remove() {
-    if (
-      !(await confirm('Remove the tournament logo from this board?', {
-        confirmLabel: 'Remove logo',
-        danger: true,
-      }))
-    )
-      return;
-    setBusy(true);
-    setError(null);
-    try {
-      await removeBoardLogo(board.id);
-      await updateBoard(firestore, tenantId, board.id, {
-        theme: { ...board.theme, logoUrl: null },
-      });
-      onAction({ type: 'LOGO_URL_SET', logoUrl: null });
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not remove that logo.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="card stack" data-tour="logo">
-      <h3>Tournament logo</h3>
-      {error ? <Alert kind="error">{error}</Alert> : null}
-      {state.logoUrl ? (
-        <img src={state.logoUrl} alt="Current tournament logo" className="logo-card__preview" />
-      ) : (
-        <p className="muted">
-          No logo set. Shown on the scoreboard, mirror, and overlay once uploaded.
-        </p>
-      )}
-      <input
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/svg+xml"
-        onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
-      />
-      <div className="row">
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          disabled={!file || busy}
-          onClick={() => void upload()}
-        >
-          {busy ? 'Uploading…' : 'Upload'}
-        </button>
-        {state.logoUrl ? (
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            disabled={busy}
-            onClick={() => void remove()}
-          >
-            Remove
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
+// LogoCard moved to components/TournamentLogoCard.tsx — Board Settings needed
+// the same upload/remove flow, and it has nothing left that was specific to
+// this page once `state.logoUrl` became a `previewUrl` prop.
 
 /**
  * Share links for the two single-clock displays: `/gameclock/:id` and

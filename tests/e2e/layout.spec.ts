@@ -163,3 +163,57 @@ test('linking mirrors a moved or resized section onto its home/away pair, until 
   await page.getByRole('button', { name: 'Away score', exact: true }).click();
   await expect(page.getByLabel('X (%)')).toHaveValue('66');
 });
+
+test('a layout code copied from one board applies to another, with no server round trip needed', async ({
+  page,
+}) => {
+  await signUp(page, freshAccount('share'));
+  await createBoard(page, 'Source Court');
+
+  // Customise and publish the source board, moving something to a spot no
+  // default layout would ever land on, so the copy is unmistakable later.
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await page.getByRole('link', { name: 'Layout', exact: true }).click();
+  await page.getByRole('button', { name: 'Customise layout' }).click();
+  await expect(preview(page).locator('.scoreboard')).toHaveClass(/sb-custom/, { timeout: 15_000 });
+
+  await page.getByRole('button', { name: 'Period', exact: true }).click();
+  await page.getByLabel('X (%)').fill('61');
+  await page.getByLabel('Y (%)').fill('11');
+  await page.getByRole('button', { name: 'Publish layout' }).click();
+  await expect(page.getByText(/Layout published/)).toBeVisible({ timeout: 15_000 });
+
+  const code = await page.locator('#copy-layout-code').inputValue();
+  expect(code.length).toBeGreaterThan(10);
+
+  // A second board, starting from the stock layout as usual. Two board cards
+  // are on the dashboard now, so "Settings" has to be scoped to the new one —
+  // unscoped, it would match Source Court's card too.
+  await page.getByRole('link', { name: 'Dashboard' }).click();
+  await createBoard(page, 'Target Court');
+  await page
+    .locator('.board-card', { hasText: 'Target Court' })
+    .getByRole('link', { name: 'Settings' })
+    .click();
+  const targetBoardId = page.url().split('/').pop();
+  await page.getByRole('link', { name: 'Layout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Customise layout' })).toBeVisible();
+
+  // Pasting a code is its own way into customising — no separate click needed.
+  await page.getByPlaceholder('Paste a layout code here…').fill(code);
+  await page.getByRole('button', { name: 'Apply code' }).click();
+  await expect(page.getByText(/Layout code applied/)).toBeVisible({ timeout: 10_000 });
+  await expect(preview(page).locator('.scoreboard')).toHaveClass(/sb-custom/, { timeout: 15_000 });
+
+  await page.getByRole('button', { name: 'Period', exact: true }).click();
+  await expect(page.getByLabel('X (%)')).toHaveValue('61');
+  await expect(page.getByLabel('Y (%)')).toHaveValue('11');
+
+  // Still only a draft until Publish — matches every other edit on this page.
+  await page.getByRole('button', { name: 'Publish layout' }).click();
+  await expect(page.getByText(/Layout published/)).toBeVisible({ timeout: 15_000 });
+
+  await page.goto(`/board/${targetBoardId}`);
+  await expect(page.locator('.scoreboard')).toHaveClass(/sb-custom/, { timeout: 20_000 });
+  await expect(page.locator('#quarter-display')).toHaveAttribute('style', /--sb-x:\s*61/);
+});

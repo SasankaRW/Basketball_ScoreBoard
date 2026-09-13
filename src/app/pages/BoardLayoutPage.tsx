@@ -37,12 +37,13 @@ import {
 } from '../../core/boardLayout.js';
 import { getFirebase } from '../../core/firebase.js';
 import { getFirestoreClient } from '../../core/firestoreClient.js';
+import { decodeLayoutCode, encodeLayoutCode } from '../../core/layoutCode.js';
 import { clearBoardLayout, subscribeBoardLayout, writeBoardLayout } from '../../core/liveLayout.js';
 import { canManageBoards } from '../../core/roles.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { LayoutCanvas, type CanvasAspect, type SnapSettings } from '../components/LayoutCanvas.js';
-import { Alert, Field, Spinner, useConfirm } from '../components/ui.js';
+import { Alert, CopyField, Field, Spinner, useConfirm } from '../components/ui.js';
 import { useBoard } from '../hooks.js';
 import type { LayoutMetrics } from '../../display/shared/layoutBridge.js';
 
@@ -76,6 +77,8 @@ export function BoardLayoutPage() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importCode, setImportCode] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
 
   /**
    * The stock arrangement, measured off the real preview.
@@ -233,6 +236,45 @@ export function BoardLayoutPage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [undo]);
+
+  // -- Sharing --------------------------------------------------------------
+
+  /**
+   * A code for whatever is on screen right now, draft included.
+   *
+   * Sharing the draft rather than the last-published layout is the point:
+   * what someone sees in the preview is what the code hands to the next
+   * board, not whatever this board happened to have live before the current
+   * editing session started.
+   */
+  const exportCode = useMemo(() => (draft ? encodeLayoutCode(draft) : null), [draft]);
+
+  async function applyImportedCode() {
+    const decoded = decodeLayoutCode(importCode);
+    if (!decoded) {
+      setImportError(
+        'That code could not be read. Copy it again from the board it came from — a code that has been cut off or edited will not decode.',
+      );
+      return;
+    }
+
+    if (
+      dirty &&
+      !(await confirm(
+        'Apply this layout code? Unpublished changes on this board will be replaced — this does not affect what is currently live until you Publish.',
+        { confirmLabel: 'Apply code', danger: true },
+      ))
+    ) {
+      return;
+    }
+
+    pushHistory(draft);
+    setDraft(decoded);
+    setSelected(null);
+    setImportCode('');
+    setImportError(null);
+    setNotice('Layout code applied. Review it here, then Publish to make it live on this board.');
+  }
 
   // -- Publishing ---------------------------------------------------------
 
@@ -485,6 +527,41 @@ export function BoardLayoutPage() {
               </p>
             </section>
           ) : null}
+
+          <section className="layout-panel__block" data-tour="layout-share">
+            <h2>Share layout</h2>
+            {exportCode ? (
+              <Field
+                label="This board's layout code"
+                hint="Paste this into another board's Layout page to copy this exact arrangement over."
+              >
+                <CopyField label="layout-code" value={exportCode} />
+              </Field>
+            ) : (
+              <p className="muted">Customise this board's layout to get a code you can share.</p>
+            )}
+
+            <Field label="Apply a layout code" hint="Paste a code copied from another board.">
+              <textarea
+                value={importCode}
+                onChange={(event) => {
+                  setImportCode(event.target.value);
+                  setImportError(null);
+                }}
+                rows={3}
+                placeholder="Paste a layout code here…"
+              />
+            </Field>
+            {importError ? <Alert kind="error">{importError}</Alert> : null}
+            <button
+              type="button"
+              className="btn btn--sm"
+              disabled={!importCode.trim()}
+              onClick={() => void applyImportedCode()}
+            >
+              Apply code
+            </button>
+          </section>
 
           <section className="layout-panel__block" data-tour="layout-canvas">
             <h2>Canvas</h2>

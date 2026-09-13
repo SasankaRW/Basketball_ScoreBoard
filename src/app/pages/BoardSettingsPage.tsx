@@ -19,6 +19,7 @@ import { BoardConfigSchema, type BoardConfig } from '../../core/schema.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
 import { IconTrash } from '../components/icons.js';
+import { TournamentLogoCard } from '../components/TournamentLogoCard.js';
 import { Alert, ConfirmDelete, CopyField, Field, Spinner, useConfirm } from '../components/ui.js';
 import { useBoard, useDispatch } from '../hooks.js';
 
@@ -303,6 +304,20 @@ export function BoardSettingsPage() {
             {saving ? 'Saving…' : 'Save settings'}
           </button>
         </div>
+      </section>
+
+      <section className="section">
+        <div className="section__head">
+          <h2>Tournament logo</h2>
+        </div>
+        <TournamentLogoCard
+          board={board}
+          tenantId={session.tenantId}
+          firestore={firestore}
+          previewUrl={board.theme.logoUrl}
+          dispatch={dispatch}
+          confirm={confirm}
+        />
       </section>
 
       <section className="section" data-tour="viewer-links">

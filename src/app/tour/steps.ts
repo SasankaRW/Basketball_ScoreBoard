@@ -220,6 +220,12 @@ export const SETTINGS_TOUR: TourDefinition = {
       placement: 'top',
     },
     {
+      anchor: '[data-tour="logo"]',
+      title: 'Tournament logo',
+      body: 'Upload a PNG, JPEG, WebP, or SVG here to set what shows on this board before a game even starts — the same upload as the one on the control panel, so it works whichever page you happen to be on.',
+      placement: 'top',
+    },
+    {
       anchor: '[data-tour="viewer-links"]',
       title: 'Display links',
       body: 'The mirror link goes on a venue screen or a second monitor; the overlay link goes into OBS as a Browser Source; the game-clock and shot-clock links each show one number full-screen. All four are read-only and need no sign-in rotating a key kills every link built from it instantly, which is also how you recover from one that leaked.',
