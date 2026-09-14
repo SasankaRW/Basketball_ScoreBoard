@@ -29,6 +29,8 @@ export const LIMITS = {
   gameClockMs: { min: 0, max: 99 * 60_000 + 59_000 },
   /** 99s — the widest value the two-digit shot clock display can render. */
   shotClockMs: { min: 0, max: 99_000 },
+  /** Fixed at one minute — see `timeoutClock` on `BoardState`. */
+  timeoutClockMs: { min: 0, max: 60_000 },
   teamName: { minLength: 1, maxLength: 24 },
   periodCount: { min: 1, max: 10 },
   foulBonusAt: { min: 1, max: 99 },
@@ -225,6 +227,22 @@ export const BoardStateSchema = z.object({
    * logo at all, rather than falling back to a default image.
    */
   logoUrl: z.string().max(600).nullable(),
+  /**
+   * The full-screen "TIMEOUT" takeover shown on the scoreboard and mirror
+   * while a timeout is being served — a fixed one-minute clock, never paused,
+   * started fresh by `TIMEOUT_TIMER_START` and never anything but running or
+   * (once its own `endsAt` has passed) inert.
+   *
+   * Modelled as an always-present `Clock`, the same as `gameClock`/
+   * `shotClock`, rather than a nullable "is one active" flag: every viewer
+   * already knows how to render *and hide* a `Clock` from `remainingAt` alone
+   * — once `remainingAt(timeoutClock, now)` reaches zero the overlay simply
+   * stops showing, with no separate "clear" write required to make it
+   * disappear. `TIMEOUT_TIMER_STOP` exists only for the operator's own early
+   * dismiss, so every screen agrees a timeout ended early rather than each
+   * still counting down its own stale minute.
+   */
+  timeoutClock: ClockSchema,
 });
 
 export type BoardState = z.infer<typeof BoardStateSchema>;
@@ -272,6 +290,7 @@ export function createInitialState(
     away: initialTeam(config.awayTeamName, config.timeouts),
     gameClock: { running: false, endsAt: null, remainingMs: config.periodLengthMs },
     shotClock: { running: false, endsAt: null, remainingMs: config.shotClockMs },
+    timeoutClock: { running: false, endsAt: null, remainingMs: 0 },
     config,
     rev: 0,
     updatedAt: now,
@@ -404,6 +423,7 @@ export function migrateLegacyState(
         LIMITS.shotClockMs.max,
       ),
     },
+    timeoutClock: { running: false, endsAt: null, remainingMs: 0 },
     config,
     rev: 0,
     updatedAt: now,
@@ -534,6 +554,14 @@ export function parseLiveBoardState(raw: unknown): BoardState | null {
     away: withTimeoutsUsed(candidate['away']),
     gameClock: withEndsAt(candidate['gameClock']),
     shotClock: withEndsAt(candidate['shotClock']),
+    // Absent entirely on a board whose last write predates this field —
+    // the same reason `timeoutsUsed` defaults rather than requires: a board
+    // already in progress when this shipped must not fail its next write.
+    timeoutClock: withEndsAt(candidate['timeoutClock']) ?? {
+      running: false,
+      endsAt: null,
+      remainingMs: 0,
+    },
     periodScores: restorePeriodScores(candidate['periodScores']),
     scheduleId: candidate['scheduleId'] ?? null,
     logoUrl: candidate['logoUrl'] ?? null,

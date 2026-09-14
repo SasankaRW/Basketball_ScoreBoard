@@ -44,6 +44,13 @@ export interface ScoreboardElements {
   quarter: HTMLElement | null;
   controlsInfo: HTMLElement | null;
   logo: HTMLImageElement | null;
+  /** The full-screen "TIMEOUT" takeover — see `state.timeoutClock`. */
+  timeoutOverlay: HTMLElement | null;
+  timeoutClock: HTMLElement | null;
+  timeoutHomeName: HTMLElement | null;
+  timeoutHomeScore: HTMLElement | null;
+  timeoutAwayName: HTMLElement | null;
+  timeoutAwayScore: HTMLElement | null;
 }
 
 export function queryScoreboardElements(
@@ -70,6 +77,12 @@ export function queryScoreboardElements(
     quarter: byId('quarter-display'),
     controlsInfo: byId('controls-info'),
     logo: byId('board-logo') as HTMLImageElement | null,
+    timeoutOverlay: byId('timeout-overlay'),
+    timeoutClock: byId('timeout-clock'),
+    timeoutHomeName: byId('timeout-home-name'),
+    timeoutHomeScore: byId('timeout-home-score'),
+    timeoutAwayName: byId('timeout-away-name'),
+    timeoutAwayScore: byId('timeout-away-score'),
   };
 }
 
@@ -162,15 +175,38 @@ export function renderScoreboard(
 
   const gameRemaining = remainingAt(state.gameClock, now);
   const shotRemaining = remainingAt(state.shotClock, now);
+  const timeoutRemaining = remainingAt(state.timeoutClock, now);
 
   setText(elements.gameClock, formatGameClock(gameRemaining, showTenths));
   setText(elements.shotClock, formatShotClock(shotRemaining, showTenths));
+
+  /**
+   * The full-screen takeover, on for as long as `state.timeoutClock` says a
+   * timeout is running *and* its own minute has not already run out —
+   * `remainingAt` alone is what makes this self-clearing: nothing has to
+   * write the board back to "no timeout" for every viewer to agree it is
+   * over, the same reason `gameClock`/`shotClock` need no such write either.
+   * Team names and scores are duplicated in here rather than left for the
+   * board underneath to show through, because the whole point of this screen
+   * is to be readable from the stands without the smaller, busier layout
+   * behind it competing for attention.
+   */
+  const timeoutActive = state.timeoutClock.running && timeoutRemaining > 0;
+  if (elements.timeoutOverlay) elements.timeoutOverlay.hidden = !timeoutActive;
+  if (timeoutActive) {
+    setText(elements.timeoutClock, formatGameClock(timeoutRemaining, false));
+    setTeamName(elements.timeoutHomeName, state.home.name);
+    setTeamName(elements.timeoutAwayName, state.away.name);
+    setText(elements.timeoutHomeScore, String(state.home.score).padStart(2, '0'));
+    setText(elements.timeoutAwayScore, String(state.away.score).padStart(2, '0'));
+  }
 
   // Wake only for whichever clock changes first, and never sleep so long that a
   // freshly started clock looks frozen.
   return Math.min(
     state.gameClock.running ? msUntilDisplayChange(gameRemaining, showTenths) : 1_000,
     state.shotClock.running ? msUntilDisplayChange(shotRemaining, showTenths) : 1_000,
+    timeoutActive ? msUntilDisplayChange(timeoutRemaining, false) : 1_000,
   );
 }
 

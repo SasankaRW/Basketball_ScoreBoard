@@ -19,9 +19,10 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { ApiCallError } from '../../core/api.js';
-import { formatGameClock, remainingAt } from '../../core/clock.js';
+import { formatGameClock, formatShotClock, remainingAt } from '../../core/clock.js';
 import {
   getSiteAdminOverview,
+  type SiteAdminBoard,
   type SiteAdminOverview,
   type SiteAdminRunningGame,
 } from '../../core/siteAdmin.js';
@@ -71,7 +72,9 @@ export function SiteAdminPage() {
   }, [refresh]);
 
   const runningGames = load.status === 'ready' ? load.overview.runningGames : [];
-  const anyClockTicking = runningGames.some((game) => game.gameClock.running);
+  const anyClockTicking = runningGames.some(
+    (game) => game.gameClock.running || game.shotClock.running,
+  );
   const now = useNow(anyClockTicking, 250);
 
   return (
@@ -116,8 +119,12 @@ export function SiteAdminPage() {
                       <th>Organisation</th>
                       <th>Board</th>
                       <th>Score</th>
+                      <th>Fouls</th>
+                      <th>Timeouts left</th>
+                      <th>Possession</th>
                       <th>Period</th>
                       <th>Clock</th>
+                      <th>Shot clock</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -136,6 +143,28 @@ export function SiteAdminPage() {
 
           <section className="section">
             <div className="section__head">
+              <h2>Boards ({load.overview.boards.length})</h2>
+            </div>
+            <div className="card card--flush">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Organisation</th>
+                    <th>Board</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {load.overview.boards.map((board) => (
+                    <BoardStatusRow key={`${board.tenantId}-${board.boardId}`} board={board} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="section">
+            <div className="section__head">
               <h2>Organisations ({load.overview.tenants.length})</h2>
             </div>
             <div className="card card--flush">
@@ -145,7 +174,7 @@ export function SiteAdminPage() {
                     <th>Organisation</th>
                     <th>Plan</th>
                     <th>Members</th>
-                    <th>Boards</th>
+                    <th>Boards active</th>
                     <th>Created</th>
                   </tr>
                 </thead>
@@ -155,7 +184,9 @@ export function SiteAdminPage() {
                       <td>{tenant.name}</td>
                       <td className="mono">{tenant.plan}</td>
                       <td>{tenant.memberCount}</td>
-                      <td>{tenant.boardCount}</td>
+                      <td>
+                        {tenant.activeBoardCount} / {tenant.boardCount}
+                      </td>
                       <td className="muted nowrap">{formatWhen(tenant.createdAt)}</td>
                     </tr>
                   ))}
@@ -170,7 +201,8 @@ export function SiteAdminPage() {
 }
 
 function RunningGameRow({ game, now }: { game: SiteAdminRunningGame; now: number }) {
-  const remaining = remainingAt(game.gameClock, now);
+  const gameRemaining = remainingAt(game.gameClock, now);
+  const shotRemaining = remainingAt(game.shotClock, now);
 
   return (
     <tr>
@@ -185,8 +217,32 @@ function RunningGameRow({ game, now }: { game: SiteAdminRunningGame; now: number
         {game.homeName} <strong>{game.homeScore}</strong> – <strong>{game.awayScore}</strong>{' '}
         {game.awayName}
       </td>
+      <td className="mono">
+        {game.homeFouls} – {game.awayFouls}
+      </td>
+      <td className="mono">
+        {game.homeTimeouts} – {game.awayTimeouts}
+      </td>
+      <td>{game.possession === 'home' ? game.homeName : game.awayName}</td>
       <td>Q{game.period}</td>
-      <td className="mono">{formatGameClock(remaining)}</td>
+      <td className="mono">{formatGameClock(gameRemaining)}</td>
+      <td className="mono">{formatShotClock(shotRemaining)}</td>
+    </tr>
+  );
+}
+
+function BoardStatusRow({ board }: { board: SiteAdminBoard }) {
+  return (
+    <tr>
+      <td>{board.tenantName}</td>
+      <td>{board.boardName}</td>
+      <td>
+        {board.active ? (
+          <span className="badge badge--live">Active</span>
+        ) : (
+          <span className="badge">Idle</span>
+        )}
+      </td>
     </tr>
   );
 }

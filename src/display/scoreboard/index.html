@@ -60,6 +60,23 @@
           </div>
         </div>
       </div>
+
+      <!-- Timeout takeover: hidden by default, shown full-screen for as long
+           as state.timeoutClock says a timeout is running. -->
+      <div class="timeout-overlay" id="timeout-overlay" hidden>
+        <div class="timeout-overlay__title">TIMEOUT</div>
+        <div class="timeout-overlay__row">
+          <div class="timeout-overlay__team">
+            <div class="timeout-overlay__name" id="timeout-home-name">HOME</div>
+            <div class="timeout-overlay__score" id="timeout-home-score">00</div>
+          </div>
+          <div class="timeout-overlay__clock" id="timeout-clock">01:00</div>
+          <div class="timeout-overlay__team">
+            <div class="timeout-overlay__name" id="timeout-away-name">AWAY</div>
+            <div class="timeout-overlay__score" id="timeout-away-score">00</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!--

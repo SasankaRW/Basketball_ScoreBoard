@@ -94,6 +94,21 @@
               "$other": { ".validate": false }
             },
 
+            // Deliberately absent from the required-children list above, the
+            // same way periodScores/scheduleId/logoUrl are: a board whose last
+            // write predates this field must not fail its next one just
+            // because an old client hasn't refreshed yet. LIMITS.timeoutClockMs
+            // in schema.ts is what the 60000 below mirrors.
+            "timeoutClock": {
+              ".validate": "newData.hasChildren(['running','remainingMs']) && newData.child('running').val() === newData.child('endsAt').exists()",
+              "running": { ".validate": "newData.isBoolean()" },
+              "endsAt": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "remainingMs": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60000"
+              },
+              "$other": { ".validate": false }
+            },
+
             "config": {
               ".validate": "newData.hasChildren(['periodLengthMs','shotClockMs','shotClockResetMs','timeouts','periodCount','startingPeriod','foulBonusAt','homeTeamName','awayTeamName','showTenthsUnderOneMinute'])",
               "periodLengthMs": {

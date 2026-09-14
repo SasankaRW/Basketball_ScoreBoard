@@ -46,7 +46,12 @@ import {
 } from '../../core/schema.js';
 import { useSession } from '../AuthProvider.js';
 import { AppShell } from '../components/AppShell.js';
-import { IconChevronDown, IconChevronUp, IconExternalLink } from '../components/icons.js';
+import {
+  IconChevronDown,
+  IconChevronUp,
+  IconClose,
+  IconExternalLink,
+} from '../components/icons.js';
 import { ShortcutEditor } from '../components/ShortcutEditor.js';
 import { TournamentLogoCard } from '../components/TournamentLogoCard.js';
 import {
@@ -61,6 +66,13 @@ import {
 import { useTour } from '../tour/TourProvider.js';
 import { useBoard, useBoardState, useDispatch, useNow } from '../hooks.js';
 
+/** `0:45`, `1:00` — the timeout popup's own countdown, not a game/shot clock. */
+function formatCountdown(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${minutes}:${String(rest).padStart(2, '0')}`;
+}
+
 export function ControlPanelPage() {
   const session = useSession();
   const { running: tourRunning } = useTour();
@@ -69,15 +81,42 @@ export function ControlPanelPage() {
   const board = useBoard(session.tenantId, boardId);
   const { state, loaded, error } = useBoardState(session.tenantId, boardId);
   const {
-    dispatch,
+    dispatch: rawDispatch,
     error: dispatchError,
     clearError,
   } = useDispatch(session.tenantId, boardId, session.uid);
 
   const readOnly = !canControlBoard(session.role);
-  const clocksActive = (state?.gameClock.running ?? false) || (state?.shotClock.running ?? false);
+  const clocksActive =
+    (state?.gameClock.running ?? false) ||
+    (state?.shotClock.running ?? false) ||
+    (state?.timeoutClock.running ?? false);
   const now = useNow(clocksActive, 100);
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  const buzzers = useMemo(() => createBuzzers(createBuzzerElements()), []);
+
+  const timeoutRemainingMs = state ? remainingAt(state.timeoutClock, now) : 0;
+  const timeoutActive = (state?.timeoutClock.running ?? false) && timeoutRemainingMs > 0;
+
+  /**
+   * Every path that spends a timeout — the keyboard shortcut and the button
+   * on `TeamPanel` alike — goes through this same `dispatch`, so wrapping it
+   * here is what starts the one-minute countdown regardless of which one was
+   * used, with nothing in either call site needing to know it exists. The
+   * countdown itself lives in `state.timeoutClock` (RTDB), not local state,
+   * so it also shows up on the scoreboard and mirror as a full-screen
+   * takeover — see `renderScoreboard()` in `scoreboardView.ts`.
+   */
+  const dispatch: Dispatch = useCallback(
+    (action) => {
+      rawDispatch(action);
+      if (action.type === 'TIMEOUT_ADJUST' && action.delta < 0) {
+        rawDispatch({ type: 'TIMEOUT_TIMER_START' });
+      }
+    },
+    [rawDispatch],
+  );
 
   const [editingTime, setEditingTime] = useState(false);
   const [editingNames, setEditingNames] = useState(false);
@@ -218,7 +257,8 @@ export function ControlPanelPage() {
   }, [state, boardId, confirm]);
 
   /**
-   * Buzzers here as well as on the scoreboard.
+   * Buzzers here as well as on the scoreboard (declared up near `dispatch` —
+   * the timeout popup needs it too — this is just the unlock wiring).
    *
    * The operator is looking at *this* screen, not the gym-wall display, so a
    * buzzer only the scoreboard can sound is one the person who needs it may
@@ -231,8 +271,6 @@ export function ControlPanelPage() {
    * the control panel without clicking it — but it costs one listener to be
    * certain.
    */
-  const buzzers = useMemo(() => createBuzzers(createBuzzerElements()), []);
-
   useEffect(() => {
     const unlock = () => buzzers.unlock();
     for (const eventName of ['pointerdown', 'keydown'] as const) {
@@ -253,17 +291,25 @@ export function ControlPanelPage() {
    */
   const gameWasRunning = useRef(false);
   const shotWasRunning = useRef(false);
+  const timeoutWasRunning = useRef(false);
 
   useEffect(() => {
     if (!state) return;
     const gameRemaining = remainingAt(state.gameClock, now);
     const shotRemaining = remainingAt(state.shotClock, now);
+    const timeoutRemaining = remainingAt(state.timeoutClock, now);
 
     if (gameWasRunning.current && gameRemaining === 0) buzzers.play('gameOver');
     if (shotWasRunning.current && shotRemaining === 0) buzzers.play('shotClock');
+    // Persisting the settled `timeoutClock` back to RTDB is the scoreboard's
+    // job (display/scoreboard/main.ts), same as it already is for the game
+    // and shot clocks — this just gives the operator the same buzzer cue in
+    // case the venue screen is out of earshot.
+    if (timeoutWasRunning.current && timeoutRemaining === 0) buzzers.play('shotClock');
 
     gameWasRunning.current = state.gameClock.running && gameRemaining > 0;
     shotWasRunning.current = state.shotClock.running && shotRemaining > 0;
+    timeoutWasRunning.current = state.timeoutClock.running && timeoutRemaining > 0;
   }, [state, now, buzzers]);
 
   /**
@@ -511,6 +557,7 @@ export function ControlPanelPage() {
               disabled={readOnly}
               onAction={dispatch}
               onEditTime={() => setEditingTime(true)}
+              confirm={confirm}
             />
 
             <TeamPanel
@@ -629,6 +676,23 @@ export function ControlPanelPage() {
       ) : null}
 
       {confirmDialog}
+
+      {timeoutActive ? (
+        <div className="timeout-popup" role="status" aria-label="Timeout timer">
+          <div className="timeout-popup__label">Timeout</div>
+          <div className="timeout-popup__time">
+            {formatCountdown(Math.ceil(timeoutRemainingMs / 1000))}
+          </div>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm btn--icon"
+            onClick={() => rawDispatch({ type: 'TIMEOUT_TIMER_STOP' })}
+            aria-label="Dismiss timeout timer"
+          >
+            <IconClose size={14} />
+          </button>
+        </div>
+      ) : null}
     </AppShell>
   );
 }
@@ -748,16 +812,45 @@ function ClockConsole({
   disabled,
   onAction,
   onEditTime,
+  confirm,
 }: {
   state: BoardState;
   now: number;
   disabled: boolean;
   onAction: Dispatch;
   onEditTime: () => void;
+  confirm: ConfirmFn;
 }) {
   const gameRemaining = remainingAt(state.gameClock, now);
   const shotRemaining = remainingAt(state.shotClock, now);
   const showTenths = state.config.showTenthsUnderOneMinute;
+
+  /**
+   * A dedicated shortcut for the common "put exactly two minutes on the clock
+   * and go" moment — the last-two-minutes-of-the-half restart in particular —
+   * rather than making someone reach for "Set time" and type 2:00 by hand
+   * every time it comes up.
+   *
+   * Two dispatches, not one: `GAME_CLOCK_SET` alone would *keep* a paused
+   * clock paused (see `clock.setRemaining` — it only changes the value a
+   * running clock counts down from, or a paused clock's frozen value, never
+   * which of those two states it's in). `GAME_CLOCK_START` is what actually
+   * gets it counting down, and it is a safe no-op if the clock somehow
+   * already was running, so this always ends in "running at 2:00" regardless
+   * of what the clock was doing a moment ago.
+   */
+  async function resetToTwoMinutesAndStart() {
+    if (
+      !(await confirm(
+        'Reset the game clock to 2:00 and start it counting down immediately? Whatever time is on the clock now will be overwritten.',
+        { confirmLabel: 'Reset & start', danger: true },
+      ))
+    ) {
+      return;
+    }
+    onAction({ type: 'GAME_CLOCK_SET', remainingMs: 120_000 });
+    onAction({ type: 'GAME_CLOCK_START' });
+  }
 
   return (
     <div className="clock-console">
@@ -781,6 +874,14 @@ function ClockConsole({
           Set time
         </button>
       </div>
+      <button
+        type="button"
+        className="btn btn--block btn--sm"
+        disabled={disabled}
+        onClick={() => void resetToTwoMinutesAndStart()}
+      >
+        Reset to 2:00 &amp; start
+      </button>
 
       <div className="clock-console__label">Shot clock</div>
       <div className="clock-console__shot">{formatShotClock(shotRemaining, showTenths)}</div>

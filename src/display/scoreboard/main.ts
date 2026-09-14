@@ -134,6 +134,7 @@ async function main(): Promise<void> {
 
   let gameWasRunning = false;
   let shotWasRunning = false;
+  let timeoutWasRunning = false;
 
   // -- Render loop --------------------------------------------------------
 
@@ -145,6 +146,7 @@ async function main(): Promise<void> {
 
     const gameRemaining = remainingAt(state.gameClock, currentTime);
     const shotRemaining = remainingAt(state.shotClock, currentTime);
+    const timeoutRemaining = remainingAt(state.timeoutClock, currentTime);
 
     /**
      * Expiry is detected locally by every surface but persisted by this one.
@@ -160,9 +162,16 @@ async function main(): Promise<void> {
       buzzers.play('shotClock');
       dispatch({ type: 'SETTLE' });
     }
+    // Same buzzer the shot clock uses on expiry — this is a venue speaker,
+    // and "time's up" is the same event either way for whoever is listening.
+    if (timeoutWasRunning && timeoutRemaining === 0) {
+      buzzers.play('shotClock');
+      dispatch({ type: 'SETTLE' });
+    }
 
     gameWasRunning = state.gameClock.running && gameRemaining > 0;
     shotWasRunning = state.shotClock.running && shotRemaining > 0;
+    timeoutWasRunning = state.timeoutClock.running && timeoutRemaining > 0;
 
     return nextDelay;
   });

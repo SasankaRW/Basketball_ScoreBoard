@@ -64,6 +64,11 @@ export type Action =
   | { type: 'SHOT_CLOCK_TOGGLE' }
   | { type: 'SHOT_CLOCK_SET'; remainingMs: number }
   | { type: 'SHOT_CLOCK_RESET'; remainingMs?: number }
+  // Timeout overlay — a fixed one-minute clock, not a per-side counter (see
+  // `TIMEOUT_ADJUST` for that); this is only the full-screen takeover shown
+  // while it's being served.
+  | { type: 'TIMEOUT_TIMER_START' }
+  | { type: 'TIMEOUT_TIMER_STOP' }
   // Whole-board
   | { type: 'CONFIG_SET'; patch: Partial<BoardConfig> }
   | { type: 'NEW_GAME'; config?: BoardConfig }
@@ -103,6 +108,8 @@ export const MUTATING_ACTIONS: ReadonlySet<ActionType> = new Set<ActionType>([
   'SHOT_CLOCK_TOGGLE',
   'SHOT_CLOCK_SET',
   'SHOT_CLOCK_RESET',
+  'TIMEOUT_TIMER_START',
+  'TIMEOUT_TIMER_STOP',
   'CONFIG_SET',
   'NEW_GAME',
   'SETTLE',
@@ -170,6 +177,10 @@ function withGameClock(state: BoardState, next: clock.Clock): BoardState | null 
 
 function withShotClock(state: BoardState, next: clock.Clock): BoardState | null {
   return next === state.shotClock ? null : { ...state, shotClock: next };
+}
+
+function withTimeoutClock(state: BoardState, next: clock.Clock): BoardState | null {
+  return next === state.timeoutClock ? null : { ...state, timeoutClock: next };
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +376,25 @@ function compute(state: BoardState, action: Action, ctx: ActionContext): BoardSt
       return clock.clocksEqual(state.shotClock, resumed) ? null : { ...state, shotClock: resumed };
     }
 
+    // -- Timeout overlay ------------------------------------------------------
+    /**
+     * Always a fresh minute, never an extension. A second timeout called
+     * moments after the first — or a misclick undone and redone — means "time
+     * this one instead", not "add a minute to what is already counting down",
+     * so this unconditionally replaces whatever `timeoutClock` already held
+     * rather than adjusting it.
+     */
+    case 'TIMEOUT_TIMER_START':
+      return withTimeoutClock(state, {
+        running: true,
+        endsAt: now + LIMITS.timeoutClockMs.max,
+        remainingMs: LIMITS.timeoutClockMs.max,
+      });
+
+    /** The operator's own early dismiss — every screen has to agree it ended. */
+    case 'TIMEOUT_TIMER_STOP':
+      return withTimeoutClock(state, { running: false, endsAt: null, remainingMs: 0 });
+
     // -- Whole-board --------------------------------------------------------
     case 'CONFIG_SET': {
       const merged = { ...state.config, ...action.patch };
@@ -404,8 +434,15 @@ function compute(state: BoardState, action: Action, ctx: ActionContext): BoardSt
     case 'SETTLE': {
       const gameClock = clock.settleExpired(state.gameClock, now);
       const shotClock = clock.settleExpired(state.shotClock, now);
-      if (gameClock === state.gameClock && shotClock === state.shotClock) return null;
-      return { ...state, gameClock, shotClock };
+      const timeoutClock = clock.settleExpired(state.timeoutClock, now);
+      if (
+        gameClock === state.gameClock &&
+        shotClock === state.shotClock &&
+        timeoutClock === state.timeoutClock
+      ) {
+        return null;
+      }
+      return { ...state, gameClock, shotClock, timeoutClock };
     }
 
     default: {

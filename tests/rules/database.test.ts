@@ -264,6 +264,41 @@ describe('write validation', () => {
     await assertFails(write({ ...base, shotClock: { running: false, remainingMs: 100_000 } }));
   });
 
+  it('accepts a running timeout clock at exactly its one-minute cap', async () => {
+    const base = validState({ rev: 2 });
+    await assertSucceeds(
+      write({
+        ...base,
+        timeoutClock: { running: true, endsAt: Date.now() + 60_000, remainingMs: 60_000 },
+      }),
+    );
+  });
+
+  it('rejects a timeout clock longer than one minute', async () => {
+    const base = validState({ rev: 2 });
+    await assertFails(
+      write({
+        ...base,
+        timeoutClock: { running: true, endsAt: Date.now() + 60_000, remainingMs: 90_000 },
+      }),
+    );
+  });
+
+  it("rejects a timeout clock whose running flag disagrees with endsAt's presence", async () => {
+    const base = validState({ rev: 2 });
+    await assertFails(write({ ...base, timeoutClock: { running: true, remainingMs: 60_000 } }));
+  });
+
+  it('is deliberately optional: a write that omits timeoutClock entirely still succeeds', async () => {
+    // Not `validState()`, which already includes it — a hand-built write
+    // standing in for a board whose last write predates this field, and whose
+    // next one (from a client that has not refreshed) must not be rejected
+    // for lacking a key it never knew about.
+    const base = validState({ rev: 2 }) as Record<string, unknown>;
+    delete base['timeoutClock'];
+    await assertSucceeds(write(base));
+  });
+
   it('rejects a missing required field', async () => {
     const base = validState({ rev: 2 }) as Record<string, unknown>;
     delete base['config'];

@@ -39,6 +39,7 @@ body {
 }
 
 .scoreboard {
+  position: relative; /* anchors .timeout-overlay, its last child */
   display: flex;
   justify-content: space-between;
   align-items: center; /* Changed from stretch to center */
@@ -971,4 +972,90 @@ body {
    section an operator has taken off the board in the editor. */
 .sb-custom .sb-item[hidden] {
   display: none;
+}
+
+/* --- Timeout takeover ---
+   Full-screen while `state.timeoutClock` is running, on top of everything
+   else on the board (including any custom layout) — [hidden] is what the
+   renderer toggles, so the base rule below only ever governs the visible
+   state. It sits as the last child of `.scoreboard` and covers that box
+   exactly, rather than the viewport, so it takes over the mirror the same
+   way it takes over the board without a separate breakpoint. */
+.timeout-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 4vh, 3rem);
+  background-color: var(--panel-bg);
+  border-radius: 15px;
+  z-index: 10;
+}
+
+.timeout-overlay[hidden] {
+  display: none;
+}
+
+.timeout-overlay__title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(3rem, 12vw, 9rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--timeout-orange);
+  text-shadow: 0 0 30px var(--timeout-orange-bg);
+}
+
+.timeout-overlay__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.5rem, 6vw, 5rem);
+  width: 100%;
+}
+
+.timeout-overlay__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.timeout-overlay__name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(1.2rem, 3.2vw, 2.75rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  color: var(--text-light);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeout-overlay__score {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(2.5rem, 9vw, 7rem);
+  font-weight: 700;
+  color: var(--score-blue);
+  background-color: var(--score-blue-bg);
+  border-radius: 10px;
+  padding: 0.1em 0.4em;
+}
+
+.timeout-overlay__clock {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(2.5rem, 9vw, 7rem);
+  font-weight: 700;
+  color: var(--timeout-orange);
+  background-color: var(--timeout-orange-bg);
+  border: 2px solid var(--timeout-orange);
+  border-radius: 10px;
+  padding: 0.1em 0.4em;
+  flex: none;
 }

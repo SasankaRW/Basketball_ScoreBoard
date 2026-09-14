@@ -279,6 +279,12 @@ export const LAYOUT_TOUR: TourDefinition = {
       body: '"Publish layout" is the only thing that reaches the gym-wall scoreboard, the mirror, and the overlay everything above it is a draft only this screen can see. "Reset to default layout" deletes the custom arrangement outright and returns every screen to the scoreboard it shipped with.',
       placement: 'left',
     },
+    {
+      anchor: '[data-tour="layout-share"]',
+      title: 'Copy a layout to another board',
+      body: "This board's current arrangement is always available here as a code, no publishing required. Paste it into any other board's Layout page — even one in a different organisation — and \"Apply code\" loads it as that board's own draft, ready to review and publish there.",
+      placement: 'left',
+    },
     helpStep,
   ],
 };

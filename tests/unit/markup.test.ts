@@ -50,6 +50,12 @@ const REQUIRED_IDS = [
   'quarter-display',
   'controls-info',
   'board-logo',
+  'timeout-overlay',
+  'timeout-clock',
+  'timeout-home-name',
+  'timeout-home-score',
+  'timeout-away-name',
+  'timeout-away-score',
 ];
 
 describe('scoreboard and mirror markup', () => {

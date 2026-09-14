@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { ApiError, database, firestore, type SignedInCaller } from './common.js';
 import { isBoardIdle, parseLiveBoardState } from '../core/schema.js';
 import type {
+  SiteAdminBoard,
   SiteAdminOverview,
   SiteAdminRunningGame,
   SiteAdminTenant,
@@ -59,7 +60,9 @@ export async function getSiteAdminOverview(caller: SignedInCaller): Promise<Site
               : 'Untitled board',
         }));
 
-      const tenant: SiteAdminTenant = {
+      // `activeBoardCount` is filled in once the live tree has been read,
+      // below — every other field is known from Firestore alone.
+      const tenant: Omit<SiteAdminTenant, 'activeBoardCount'> = {
         id: tenantDoc.id,
         name: typeof data['name'] === 'string' ? data['name'] : 'Untitled organisation',
         plan: typeof data['plan'] === 'string' ? data['plan'] : 'free',
@@ -72,8 +75,6 @@ export async function getSiteAdminOverview(caller: SignedInCaller): Promise<Site
     }),
   );
 
-  const tenants = perTenant.map((entry) => entry.tenant).sort((a, b) => b.createdAt - a.createdAt);
-
   // One read for the whole tree rather than one per board — `live/{tenantId}`
   // holds every board this tenant has, so this is the same number of round
   // trips regardless of how many tenants or boards exist.
@@ -84,13 +85,29 @@ export async function getSiteAdminOverview(caller: SignedInCaller): Promise<Site
   >;
 
   const runningGames: SiteAdminRunningGame[] = [];
-  for (const { tenant, boards } of perTenant) {
-    const tenantLive = liveTree[tenant.id];
-    if (!tenantLive) continue;
+  // Every non-archived board, active or not — `runningGames` above only ever
+  // carries the active ones, which cannot answer "is this particular idle
+  // board actually wired up correctly" the way a full directory can.
+  const boards: SiteAdminBoard[] = [];
+  const activeBoardCounts = new Map<string, number>();
 
-    for (const board of boards) {
-      const state = parseLiveBoardState(tenantLive[board.id]?.state);
-      if (!state || isBoardIdle(state)) continue;
+  for (const { tenant, boards: tenantBoards } of perTenant) {
+    const tenantLive = liveTree[tenant.id];
+
+    for (const board of tenantBoards) {
+      const state = parseLiveBoardState(tenantLive?.[board.id]?.state);
+      const active = state !== null && !isBoardIdle(state);
+
+      boards.push({
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        boardId: board.id,
+        boardName: board.name,
+        active,
+      });
+
+      if (!active || !state) continue;
+      activeBoardCounts.set(tenant.id, (activeBoardCounts.get(tenant.id) ?? 0) + 1);
 
       runningGames.push({
         tenantId: tenant.id,
@@ -99,13 +116,26 @@ export async function getSiteAdminOverview(caller: SignedInCaller): Promise<Site
         boardName: board.name,
         homeName: state.home.name,
         homeScore: state.home.score,
+        homeFouls: state.home.fouls,
+        homeTimeouts: state.home.timeouts,
         awayName: state.away.name,
         awayScore: state.away.score,
+        awayFouls: state.away.fouls,
+        awayTimeouts: state.away.timeouts,
         period: state.period,
+        possession: state.possession,
         gameClock: state.gameClock,
+        shotClock: state.shotClock,
       });
     }
   }
 
-  return { tenants, runningGames };
+  const tenants = perTenant
+    .map(({ tenant }): SiteAdminTenant => ({
+      ...tenant,
+      activeBoardCount: activeBoardCounts.get(tenant.id) ?? 0,
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  return { tenants, runningGames, boards };
 }

@@ -2413,3 +2413,44 @@ textarea:focus {
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* ------------------------------------------------------------ timeout popup */
+/*
+   A floating, non-blocking countdown — deliberately not a Modal. A timeout is
+   over well before an operator would want to dismiss anything, and the rest
+   of the control panel (score, fouls, the game clock) has to stay usable
+   while it counts down, which a modal's backdrop would prevent.
+*/
+
+.timeout-popup {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-overlay);
+  border: 1px solid var(--yellow);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  animation: modal-backdrop-in var(--base) var(--ease);
+}
+
+.timeout-popup__label {
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--yellow);
+}
+
+.timeout-popup__time {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 2.6em;
+  text-align: center;
+}

@@ -36,10 +36,25 @@ test('the allow-listed email sees every organisation and every running game', as
 
   await expect(page.locator('tr', { hasText: orgName }).first()).toBeVisible();
 
-  const gameRow = page.locator('tr', { hasText: 'Site Admin Court' });
+  const gameRow = page.locator('tr', { hasText: 'Site Admin Court' }).first();
   await expect(gameRow).toContainText('HOME');
   await expect(gameRow).toContainText('AWAY');
   await expect(gameRow).toContainText('Q1');
+
+  // The board directory lists every board, active or not — this one shows up
+  // there too, tagged Active rather than merely appearing in "Running games".
+  const boardsSection = page.locator('section', {
+    has: page.getByRole('heading', { name: /^Boards/ }),
+  });
+  const boardRow = boardsSection.locator('tr', { hasText: 'Site Admin Court' });
+  await expect(boardRow.getByText('Active')).toBeVisible();
+
+  // The organisation's own row reports the same thing as a fraction.
+  const orgsSection = page.locator('section', {
+    has: page.getByRole('heading', { name: /^Organisations/ }),
+  });
+  const orgRow = orgsSection.locator('tr', { hasText: orgName });
+  await expect(orgRow).toContainText('1 / 1');
 });
 
 test('every other account is turned away', async ({ page }) => {

@@ -66,7 +66,11 @@ async function buildDeterministicBoard(page: import('@playwright/test').Page): P
   await page.getByRole('button', { name: 'Increase away fouls' }).click();
 
   // One timeout spent on the home side, so the two teams' displays visibly differ.
+  // Spending it also starts the full-screen takeover (state.timeoutClock) — dismissed
+  // immediately since this fixture is only after the timeout *count* changing, not
+  // a screenshot of the takeover itself.
   await page.getByRole('button', { name: 'Use home timeout' }).click();
+  await page.getByRole('button', { name: 'Dismiss timeout timer' }).click();
 
   // Period 2, so the display reads something other than the Q1 default.
   await page.getByRole('button', { name: 'Increase period' }).click();
