@@ -1059,3 +1059,10 @@ body {
   padding: 0.1em 0.4em;
   flex: none;
 }
+
+/* Temporarily hidden per request — the arrow's own toggle logic is untouched
+   (B still flips state.possession, the control panel still shows it), this
+   just stops it from rendering. Delete this rule to bring it back. */
+.possession-arrow {
+  display: none !important;
+}
