@@ -38,6 +38,31 @@ export async function inviteMember(
     throw new ApiError(403, 'Only the owner can invite another owner.');
   }
 
+  // A membership is single-tenant and single-role — `acceptInvite` calls
+  // `setCustomUserClaims` with exactly `{ tenantId, role }`, replacing
+  // whatever the account already held. Letting an invite target an email
+  // that already has a tenant home would silently downgrade (or relocate) an
+  // existing member the moment they accepted it — an owner invited back in
+  // as an operator would lose ownership with no warning. `userIndex` is
+  // exactly the "does this uid already belong to a tenant" record `acceptInvite`
+  // itself maintains, so checking it here catches this before an invite is
+  // even created, not just when one is accepted.
+  let existingUid: string | null = null;
+  try {
+    existingUid = (await auth.getUserByEmail(input.email.toLowerCase())).uid;
+  } catch {
+    // No account with this email yet — nothing to check.
+  }
+  if (existingUid) {
+    const existingIndex = await firestore.collection('userIndex').doc(existingUid).get();
+    if (existingIndex.exists) {
+      throw new ApiError(
+        412,
+        'This person already belongs to an organisation. Change their role from the members list instead of inviting them again.',
+      );
+    }
+  }
+
   const tenantRef = firestore.collection('tenants').doc(caller.tenantId);
   const tenantSnapshot = await tenantRef.get();
   const limits = limitsForPlan(tenantSnapshot.data()?.['plan']);
@@ -97,6 +122,16 @@ export async function acceptInvite(
 
   const tenantId = data['tenantId'] as string;
   const role = data['role'] as MemberRole;
+
+  // Backstop for `inviteMember`'s own check: an invite can be created before
+  // this account existed, or before it joined some other way, and still be
+  // sitting around by the time it's accepted. `setCustomUserClaims` replaces
+  // the claim outright, so applying it blind here is exactly how an owner
+  // ends up "accepted" back in at a lower role. If this uid already has a
+  // tenant home, that invite is stale — accepting it must not touch claims.
+  if ((await firestore.collection('userIndex').doc(uid).get()).exists) {
+    throw new ApiError(412, 'You already belong to an organisation.');
+  }
 
   await auth.setCustomUserClaims(uid, { tenantId, role });
 

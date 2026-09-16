@@ -5,6 +5,7 @@
  * and this page's rendering can never quietly drift apart.
  */
 import { callApi } from './api.js';
+import type { PeriodPoints } from './matchRecord.js';
 import type { Clock, Side } from './schema.js';
 
 export interface SiteAdminTenant {
@@ -64,6 +65,43 @@ export interface SiteAdminOverview {
   boards: SiteAdminBoard[];
 }
 
+/** A finished game, trimmed to what the site-admin history list shows — no play-by-play. */
+export interface SiteAdminMatchSummary {
+  id: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeScore: number;
+  awayScore: number;
+  periodsPlayed: number;
+  periodScores: PeriodPoints[];
+  startedAt: number;
+  endedAt: number;
+  durationMs: number;
+}
+
 export async function getSiteAdminOverview(): Promise<SiteAdminOverview> {
-  return callApi<SiteAdminOverview>('siteAdminOverview', {});
+  return callApi<SiteAdminOverview>('siteAdmin', { op: 'overview' });
+}
+
+/**
+ * Deletes a board in any organisation — live state, secrets, and its
+ * `boardIndex` entry included, the same cleanup `deleteBoard` does for a
+ * tenant's own admin, just parameterised by an explicit `tenantId` since the
+ * caller is not that tenant's member.
+ */
+export async function deleteSiteAdminBoard(tenantId: string, boardId: string): Promise<void> {
+  await callApi<{ deleted: true }>('siteAdmin', { op: 'deleteBoard', tenantId, boardId });
+}
+
+/** The most recent finished games on one board, newest first. */
+export async function getSiteAdminBoardMatches(
+  tenantId: string,
+  boardId: string,
+): Promise<SiteAdminMatchSummary[]> {
+  const { matches } = await callApi<{ matches: SiteAdminMatchSummary[] }>('siteAdmin', {
+    op: 'boardMatches',
+    tenantId,
+    boardId,
+  });
+  return matches;
 }

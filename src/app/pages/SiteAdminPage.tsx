@@ -21,13 +21,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiCallError } from '../../core/api.js';
 import { formatGameClock, formatShotClock, remainingAt } from '../../core/clock.js';
 import {
+  deleteSiteAdminBoard,
+  getSiteAdminBoardMatches,
   getSiteAdminOverview,
   type SiteAdminBoard,
+  type SiteAdminMatchSummary,
   type SiteAdminOverview,
   type SiteAdminRunningGame,
 } from '../../core/siteAdmin.js';
 import { AppShell } from '../components/AppShell.js';
-import { Alert, Spinner } from '../components/ui.js';
+import { Alert, Modal, Spinner, useConfirm } from '../components/ui.js';
 import { useNow } from '../hooks.js';
 
 function formatWhen(ms: number): string {
@@ -40,6 +43,18 @@ function formatWhen(ms: number): string {
   });
 }
 
+function formatDuration(ms: number): string {
+  const totalMinutes = Math.round(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+}
+
+/** Q1–Q4 then OT1, OT2… — same labelling as the tenant-facing history page. */
+function periodLabel(period: number): string {
+  return period <= 4 ? `Q${period}` : `OT${period - 4}`;
+}
+
 type LoadState =
   | { status: 'loading' }
   | { status: 'forbidden' }
@@ -48,6 +63,10 @@ type LoadState =
 
 export function SiteAdminPage() {
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingBoardId, setDeletingBoardId] = useState<string | null>(null);
+  const [historyBoard, setHistoryBoard] = useState<SiteAdminBoard | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const refresh = useCallback(() => {
     setLoad((current) => (current.status === 'ready' ? current : { status: 'loading' }));
@@ -77,6 +96,25 @@ export function SiteAdminPage() {
   );
   const now = useNow(anyClockTicking, 250);
 
+  async function handleDelete(board: SiteAdminBoard) {
+    setActionError(null);
+    const confirmed = await confirm(
+      `Delete "${board.boardName}" from ${board.tenantName}? This removes its live state and match history stays, but the board itself cannot be recovered.`,
+      { confirmLabel: 'Delete board', danger: true },
+    );
+    if (!confirmed) return;
+
+    setDeletingBoardId(board.boardId);
+    try {
+      await deleteSiteAdminBoard(board.tenantId, board.boardId);
+      refresh();
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : 'Could not delete that board.');
+    } finally {
+      setDeletingBoardId(null);
+    }
+  }
+
   return (
     <AppShell tenantName="Site admin">
       <div className="page-head">
@@ -99,6 +137,7 @@ export function SiteAdminPage() {
       {load.status === 'loading' ? <Spinner label="Loading…" /> : null}
       {load.status === 'forbidden' ? <Alert kind="error">Not authorised.</Alert> : null}
       {load.status === 'error' ? <Alert kind="error">{load.message}</Alert> : null}
+      {actionError ? <Alert kind="error">{actionError}</Alert> : null}
 
       {load.status === 'ready' ? (
         <>
@@ -152,11 +191,18 @@ export function SiteAdminPage() {
                     <th>Organisation</th>
                     <th>Board</th>
                     <th>Status</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {load.overview.boards.map((board) => (
-                    <BoardStatusRow key={`${board.tenantId}-${board.boardId}`} board={board} />
+                    <BoardStatusRow
+                      key={`${board.tenantId}-${board.boardId}`}
+                      board={board}
+                      deleting={deletingBoardId === board.boardId}
+                      onViewHistory={() => setHistoryBoard(board)}
+                      onDelete={() => void handleDelete(board)}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -196,6 +242,12 @@ export function SiteAdminPage() {
           </section>
         </>
       ) : null}
+
+      {confirmDialog}
+
+      {historyBoard ? (
+        <BoardHistoryModal board={historyBoard} onClose={() => setHistoryBoard(null)} />
+      ) : null}
     </AppShell>
   );
 }
@@ -231,7 +283,17 @@ function RunningGameRow({ game, now }: { game: SiteAdminRunningGame; now: number
   );
 }
 
-function BoardStatusRow({ board }: { board: SiteAdminBoard }) {
+function BoardStatusRow({
+  board,
+  deleting,
+  onViewHistory,
+  onDelete,
+}: {
+  board: SiteAdminBoard;
+  deleting: boolean;
+  onViewHistory: () => void;
+  onDelete: () => void;
+}) {
   return (
     <tr>
       <td>{board.tenantName}</td>
@@ -243,6 +305,79 @@ function BoardStatusRow({ board }: { board: SiteAdminBoard }) {
           <span className="badge">Idle</span>
         )}
       </td>
+      <td className="table__actions">
+        <button type="button" className="btn btn--sm" onClick={onViewHistory}>
+          History
+        </button>
+        <button
+          type="button"
+          className="btn btn--sm btn--danger"
+          onClick={onDelete}
+          disabled={deleting}
+        >
+          {deleting ? 'Deleting…' : 'Delete'}
+        </button>
+      </td>
     </tr>
+  );
+}
+
+function BoardHistoryModal({ board, onClose }: { board: SiteAdminBoard; onClose: () => void }) {
+  const [matches, setMatches] = useState<SiteAdminMatchSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSiteAdminBoardMatches(board.tenantId, board.boardId)
+      .then((result) => {
+        if (!cancelled) setMatches(result);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : 'Could not load match history.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [board.tenantId, board.boardId]);
+
+  return (
+    <Modal title={`${board.boardName} — match history`} onClose={onClose}>
+      {error ? <Alert kind="error">{error}</Alert> : null}
+
+      {!error && matches === null ? <Spinner label="Loading match history…" /> : null}
+
+      {matches !== null && matches.length === 0 ? (
+        <p className="muted">No matches finished on this board yet.</p>
+      ) : null}
+
+      {matches !== null && matches.length > 0 ? (
+        <div className="card--flush">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Result</th>
+                <th>Periods</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matches.map((match) => (
+                <tr key={match.id}>
+                  <td className="muted nowrap">{formatWhen(match.endedAt)}</td>
+                  <td className="mono">
+                    {match.homeTeamName} {match.homeScore} – {match.awayScore} {match.awayTeamName}
+                  </td>
+                  <td>{periodLabel(match.periodsPlayed)}</td>
+                  <td className="mono">{formatDuration(match.durationMs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </Modal>
   );
 }
