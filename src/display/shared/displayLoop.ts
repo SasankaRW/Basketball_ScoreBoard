@@ -31,10 +31,31 @@ export function startDisplayLoop(render: () => number): () => void {
     handle = setTimeout(step, delay);
   };
 
+  /**
+   * Timers surviving a hidden tab is not the same as surviving it *on time*.
+   * A backgrounded page's `setTimeout` is clamped to about a second, and after
+   * a few minutes hidden Chrome cuts it to roughly once a minute — so a
+   * surface coming back into view is still showing whatever frame its last
+   * late tick drew, which on a clock reads as a stall followed by a jump. The
+   * deadline arithmetic was right the whole time; nobody had asked it.
+   *
+   * Rendering on the transition replaces that frame before anyone reads it,
+   * and re-arms the timer from now rather than leaving the throttled one to
+   * expire in its own time.
+   */
+  const onVisibilityChange = () => {
+    if (stopped || document.visibilityState !== 'visible') return;
+    if (handle !== null) clearTimeout(handle);
+    step();
+  };
+
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
   step();
 
   return () => {
     stopped = true;
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     if (handle !== null) clearTimeout(handle);
   };
 }
