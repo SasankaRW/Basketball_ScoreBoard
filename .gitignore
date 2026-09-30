@@ -25,6 +25,12 @@ blob-report/
 .env.local
 .env.*.local
 
+# Firebase service-account keys: full Admin SDK access to the whole project,
+# and no way to un-leak one once it is pushed.
+*-firebase-adminsdk-*.json
+serviceAccount*.json
+service-account*.json
+
 # Editor / OS
 .DS_Store
 Thumbs.db
